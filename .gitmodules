@@ -1,0 +1,9 @@
+[submodule "g4hepem"]
+	path = externals/g4hepem
+	url = ./g4hepem
+[submodule "hepemshow"]
+	path = hepemshow
+	url = ./hepemshow
+[submodule "CoDiPack"]
+	path = externals/CoDiPack
+	url = ./CoDiPack
