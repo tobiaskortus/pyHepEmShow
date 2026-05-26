@@ -17,7 +17,26 @@ def _so_files():
     return glob.glob(os.path.join(BUILD_DIR, f"pyhepemshow*{ext_suffix}"))
 
 
+def _init_submodules():
+    git_dir = os.path.join(ROOT, ".git")
+    if not os.path.exists(git_dir):
+        return
+    submodule_dirs = [
+        os.path.join(ROOT, "externals", "g4hepem"),
+        os.path.join(ROOT, "externals", "CoDiPack"),
+    ]
+    needs_init = any(
+        not os.path.isdir(d) or not os.listdir(d) for d in submodule_dirs
+    )
+    if needs_init:
+        subprocess.run(
+            ["git", "submodule", "update", "--init", "--recursive"],
+            check=True, cwd=ROOT,
+        )
+
+
 def _ensure_built():
+    _init_submodules()
     # First time: configure (cmake) + build
     if not os.path.isdir(BUILD_DIR):
         script = os.path.join(ROOT, "externals", "configure.sh")
