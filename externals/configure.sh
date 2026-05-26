@@ -22,6 +22,7 @@ mkdir -p build_$PREFIX
 cd       build_$PREFIX
 cmake .. \
  -DG4HepEm_GEANT4_BUILD=OFF \
+ -DBUILD_SHARED_LIBS=OFF \
  -DCMAKE_INSTALL_PREFIX=$PWD/../install_$PREFIX \
  -DCMAKE_BUILD_TYPE=Debug -DCODI_FORWARD=yes \
  -DCoDiPack_DIR=$PWD/../../CoDiPack/cmake \
