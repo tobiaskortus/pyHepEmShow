@@ -1,6 +1,6 @@
 [submodule "g4hepem"]
 	path = externals/g4hepem
-	url = ./g4hepem
+	url = https://github.com/SciCompKL/g4hepem.git
 [submodule "CoDiPack"]
 	path = externals/CoDiPack
-	url = ./CoDiPack
+	url = https://github.com/SciCompKL/CoDiPack.git
