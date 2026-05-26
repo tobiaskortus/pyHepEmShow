@@ -1,7 +1,7 @@
 build
 docs/build
 docs/doxygen
-
+build_*
 
 # Prerequisites
 *.d
