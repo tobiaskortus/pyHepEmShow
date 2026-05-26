@@ -10,11 +10,23 @@ from setuptools.command.build_ext import build_ext as _BuildExt
 VARIANT = "msc_no_ad_fix_yes"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BUILD_DIR = os.path.join(ROOT, "hepemshow", f"build_{VARIANT}")
+G4HEPEM_INSTALL = os.path.join(ROOT, "externals", "g4hepem", f"install_{VARIANT}")
 
 
 def _so_files():
     ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
     return glob.glob(os.path.join(BUILD_DIR, f"pyhepemshow*{ext_suffix}"))
+
+
+def _g4hepem_libs():
+    """Shared libraries that must be bundled alongside the extension."""
+    lib_dir = os.path.join(G4HEPEM_INSTALL, "lib")
+    if not os.path.isdir(lib_dir):
+        lib_dir = os.path.join(G4HEPEM_INSTALL, "lib64")
+    return (
+        glob.glob(os.path.join(lib_dir, "libg4HepEm*.dylib"))
+        + glob.glob(os.path.join(lib_dir, "libg4HepEm*.so*"))
+    )
 
 
 def _init_submodules():
@@ -53,13 +65,14 @@ def _ensure_built():
 class CMakeBuildExt(_BuildExt):
     def run(self):
         so_files = _ensure_built()
+        libs = _g4hepem_libs()
 
-        for so in so_files:
-            shutil.copy2(so, ROOT)
+        for f in so_files + libs:
+            shutil.copy2(f, ROOT)
 
         os.makedirs(self.build_lib, exist_ok=True)
-        for so in so_files:
-            shutil.copy2(so, self.build_lib)
+        for f in so_files + libs:
+            shutil.copy2(f, self.build_lib)
 
 
 setup(
