@@ -4,6 +4,8 @@
 #ifndef GEOMETRY_HH
 #define GEOMETRY_HH
 
+#include <vector>
+
 /**
  * @file    Geometry.hh
  * @class   Geometry
@@ -25,12 +27,12 @@
  *
  * - `absorber`:
  *   - thickness:   `fAbsThick`
- *   - set/get  :   `SetAbsThick(G4double)`/`GetAbsThick()`
+ *   - set/get  :   `SetAbsThickPerLayer(std::vector<G4double>)`/`GetAbsThickVec()`
  *   - material :   lead tungstate/atolzite (`"G4_PbWO4"`) with material `index = 1` (by default)
  *
  * - `gap`:
  *   - thickness:   `fGapThick`
- *   - set/get  :   `SetGapThick(G4double)`/`GetGapThick()`
+ *   - set/get  :   `SetGapThickPerLayer(std::vector<G4double>)`/`GetGapThickVec()`
  *   - material :   liquid argon (`"G4_lAr"`) with material `index = 2` (by default)
  *
  * @note The default length unit is [mm] so all thicknesses and sizes are
@@ -143,9 +145,13 @@ public:
   /** Sets the number of layers the entire calorimeter should be built up.
     * @param[in]  nlayers Number of layers (must be > 0) requested (all parameters are recalculated).
     */
-  void   SetNumLayers (int nlayers) {
+  void  SetNumLayers (int nlayers) {
     if (nlayers > 0) {
+      G4double prevAbs = fAbsThick.back();
+      G4double prevGap = fGapThick.back();
       fNumLayers = nlayers;
+      fAbsThick.resize(nlayers, prevAbs);
+      fGapThick.resize(nlayers, prevGap);
       UpdateParameters();
     }
   }
@@ -166,38 +172,33 @@ public:
   }
 
 
-  /** Sets the required absorber thickness (i.e. full size along the x-axis).
-    * @param[in]  thickness Required thickness of the `absorber` in [mm].
+  /** Sets per-layer absorber thicknesses independently.
+    * @param[in]  thicknesses Vector of per-layer absorber thicknesses in [mm]. Must have exactly `fNumLayers` elements.
     */
-  void   SetAbsThick (G4double thickness) {
-    fAbsThick = thickness;
+  void   SetAbsThickPerLayer (const std::vector<G4double>& thicknesses) {
+    fAbsThick = thicknesses;
     UpdateParameters();
   }
 
-  /** Gives the thickness of the `absorber` (i.e. full size along the x-axis).
-    * @return thickness of the `absorber` in [mm] units.
+  /** Gives the full vector of per-layer absorber thicknesses.
+    * @return const reference to the per-layer absorber thickness vector in [mm] units.
     */
-  G4double GetAbsThick ( ) const {
+  const std::vector<G4double>& GetAbsThickVec() const {
     return fAbsThick;
   }
 
-  /** Sets the required `gap` thickness (i.e. full size along the x-axis).
-    *
-    * Note, that the `gap` thickness can also be set to zero. The calorimeter is
-    * built up from a single material layers, i.e. a block of material sliced along
-    * the x-axis.
-    *
-    * @param[in]  thickness Required thickness of the `gap` in [mm] (can be set to 0).
+  /** Sets per-layer gap thicknesses independently.
+    * @param[in]  thicknesses Vector of per-layer gap thicknesses in [mm]. Must have exactly `fNumLayers` elements.
     */
-  void   SetGapThick (G4double thickness) {
-    fGapThick = thickness;
+  void   SetGapThickPerLayer (const std::vector<G4double>& thicknesses) {
+    fGapThick = thicknesses;
     UpdateParameters();
   }
 
-  /** Gives the thickness of the `gap` (i.e. full size along the x-axis).
-    * @return thickness of the `gap` in [mm] units.
+  /** Gives the full vector of per-layer gap thicknesses.
+    * @return const reference to the per-layer gap thickness vector in [mm] units.
     */
-  G4double GetGapThick ( ) const {
+  const std::vector<G4double>& GetGapThickVec() const {
     return fGapThick;
   }
 
@@ -329,17 +330,21 @@ private:
     * Can be set (even to zero: calorimeter is just a single volume/box)*/
   int    fNumLayers;
 
-  /** `Absorber` thickness measured along the `x`-axis in [mm] (can be set)*/
-  G4double fAbsThick;
+  /** Per-layer absorber thickness measured along the `x`-axis in [mm] (can be set)*/
+  std::vector<G4double> fAbsThick;
 
-  /** `Gap` thickness measured along the `x`-axis in [mm] (can be set; even to
+  /** Per-layer gap thickness measured along the `x`-axis in [mm] (can be set; even to
     *  zero: single material `calorimeter` sliced by layers along the `x`-axis)*/
-  G4double fGapThick;
+  std::vector<G4double> fGapThick;
 
-  /** `Layer` thickness measured along the `x` axes in [mm].
-    *  Computed automatically (whenever the `absorber` or `gap` thickness is
-    *  updated*/
-  G4double fLayerThick;
+  /** Per-layer thickness measured along the `x` axes in [mm].
+    *  Computed automatically (whenever the `absorber` or `gap` thickness is updated)*/
+  std::vector<G4double> fLayerThick;
+
+  /** Cumulative x-start of each layer relative to the calorimeter left edge [mm].
+    *  fLayerStartX[i] = sum of all fLayerThick[0..i-1]. fLayerStartX[fNumLayers] = fCaloThick.
+    *  Computed automatically in UpdateParameters(). */
+  std::vector<G4double> fLayerStartX;
 
   /** The thickness of the entire `calorimeter` measured along the `x` axes in [mm]
     * Computed automatically whenever the `layer` thickness (i.e. absorber and/or

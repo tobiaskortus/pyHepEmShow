@@ -10,9 +10,13 @@
 Geometry::Geometry() {
   // default values: 50 layers of 2.3 [mm] absorber (PbWO4) and 5.7 [mm] gap (lAr)
   fNumLayers  =  50;
-  fAbsThick   = 2.3; // defult value [mm]
-  fGapThick   = 5.7; // defult value [mm]
   fCaloSizeYZ = 400; // defult value [mm]
+
+  // initialize per-layer thickness vectors with default values
+  fAbsThick.assign(fNumLayers, 2.3);
+  fGapThick.assign(fNumLayers, 5.7);
+  fLayerThick.resize(fNumLayers);
+  fLayerStartX.resize(fNumLayers + 1);
 
   // these will be computed automatically in the `UpdateParameters`
   fCaloStartX       = 0.0;
@@ -42,10 +46,15 @@ Geometry::~Geometry() {
 
 
 void Geometry::UpdateParameters() {
-  // calculate the layer and calorimeter thicknesses based on the `absorber`,
-  // `gap` thinkesses and the number of layers
-  fLayerThick = fAbsThick + fGapThick;
-  fCaloThick  = fNumLayers*fLayerThick;
+  // compute per-layer thicknesses and cumulative layer start positions
+  fLayerThick.resize(fNumLayers);
+  fLayerStartX.resize(fNumLayers + 1);
+  fLayerStartX[0] = 0.0;
+  for (int i = 0; i < fNumLayers; ++i) {
+    fLayerThick[i] = fAbsThick[i] + fGapThick[i];
+    fLayerStartX[i+1] = fLayerStartX[i] + fLayerThick[i];
+  }
+  fCaloThick = fLayerStartX[fNumLayers];
 
   // set/calculate the left hand side x point where the calorimeter starts
   fCaloStartX = -0.5*fCaloThick;
@@ -67,18 +76,22 @@ void Geometry::UpdateParameters() {
   fBoxCalo->SetHalfLength(halfCaloYZ, 1);
   fBoxCalo->SetHalfLength(halfCaloYZ, 2);
 
-
-  fBoxLayer->SetHalfLength(0.5*fLayerThick, 0);
+  // YZ sizes for layer/abs/gap are fixed; x half-lengths are set per-call in CalculateDistanceToOut
   fBoxLayer->SetHalfLength(halfCaloYZ, 1);
   fBoxLayer->SetHalfLength(halfCaloYZ, 2);
 
-  fBoxAbs->SetHalfLength(0.5*fAbsThick, 0);
   fBoxAbs->SetHalfLength(halfCaloYZ, 1);
   fBoxAbs->SetHalfLength(halfCaloYZ, 2);
 
-  fBoxGap->SetHalfLength(0.5*fGapThick, 0);
   fBoxGap->SetHalfLength(halfCaloYZ, 1);
   fBoxGap->SetHalfLength(halfCaloYZ, 2);
+
+  // set x half-lengths to first-layer values as initial/fallback
+  if (fNumLayers > 0) {
+    fBoxLayer->SetHalfLength(0.5*fLayerThick[0], 0);
+    fBoxAbs->SetHalfLength(0.5*fAbsThick[0], 0);
+    fBoxGap->SetHalfLength(0.5*fGapThick[0], 0);
+  }
 }
 
 
@@ -101,11 +114,25 @@ G4double Geometry::CalculateDistanceToOut(G4double* r, G4double *v, Box** curren
   }
 
   // calculate the position in the `layer` system:
-  // - first calculate the index of the `layer` in which the point is located
-  const int iLayer = int( GET_VALUE(((rx_Calo+0.5*fCaloThick)/fLayerThick)) );
+  // - find the layer index by scanning cumulative layer start positions
+  const G4double rxRel = rx_Calo + 0.5*fCaloThick; // position relative to calo left edge
+  int iLayer = fNumLayers - 1;
+  for (int i = 0; i < fNumLayers - 1; ++i) {
+    if (GET_VALUE(rxRel) < GET_VALUE(fLayerStartX[i+1])) {
+      iLayer = i;
+      break;
+    }
+  }
   *indxLayer = iLayer;
-  // - then the corresponding translation vector and transform the point
-  const G4double trLayeri = -0.5*fCaloThick + (iLayer+0.5)*fLayerThick;
+
+  // set layer box x half-length for this specific layer
+  const G4double layThick = fLayerThick[iLayer];
+  const G4double absThick = fAbsThick[iLayer];
+  const G4double gapThick = fGapThick[iLayer];
+  fBoxLayer->SetHalfLength(0.5*layThick, 0);
+
+  // - then the corresponding translation vector and transform the point to layer-local coords
+  const G4double trLayeri = -0.5*fCaloThick + fLayerStartX[iLayer] + 0.5*layThick;
   const G4double rx_Layer = rx_Calo - trLayeri;
   r[0] =  rx_Layer;
 
@@ -118,10 +145,11 @@ G4double Geometry::CalculateDistanceToOut(G4double* r, G4double *v, Box** curren
   }
 
   // calculate if the point is in the `absorber` or the `gap` part of the `layer`
-  if (rx_Layer + 0.5*fLayerThick < fAbsThick || fGapThick == 0) { // in the `absorber`
+  if (rx_Layer + 0.5*layThick < absThick || gapThick == 0) { // in the `absorber`
     // calculate the position in the `absorber` system:
     // - the translation vector and transform the point
-    const G4double trAbs = -0.5*(fLayerThick - fAbsThick);
+    fBoxAbs->SetHalfLength(0.5*absThick, 0);
+    const G4double trAbs = -0.5*(layThick - absThick);
     r[0] = rx_Layer - trAbs;
     // set what is left and calculate the distance to the `absorber` boundary along
     // the given direction (again, I could push here and do recursion whenever it's zero)
@@ -131,7 +159,8 @@ G4double Geometry::CalculateDistanceToOut(G4double* r, G4double *v, Box** curren
   } else { // in the `gap`
     // calculate the position in the `gap` system:
     // - the translation vector and transform the point
-    const G4double  trGap = -0.5*(fLayerThick -fGapThick) + fAbsThick;
+    fBoxGap->SetHalfLength(0.5*gapThick, 0);
+    const G4double  trGap = -0.5*(layThick - gapThick) + absThick;
     r[0] = rx_Layer - trGap;
     // set what is left and calculate the distance to the `gap` boundary along
     // the given direction (again, I could push here and do recursion whenever it's zero)

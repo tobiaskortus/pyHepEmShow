@@ -1,7 +1,5 @@
 #include "ad_type.h"
 
-
-
 #include "EventLoop.hh"
 
 #include "G4HepEmTLData.hh"
@@ -160,12 +158,19 @@ void EventLoop::BeginOfEventAction(Results& theResult, int eventID, const G4HepE
   #ifdef CODI_REVERSE
     G4double::getTape().reset();
     G4double::getTape().setActive();
-    theResult.pThicknessAbsorber = theGeometry.GetAbsThick();
-    G4double::getTape().registerInput(theResult.pThicknessAbsorber);
-    theGeometry.SetAbsThick(theResult.pThicknessAbsorber);
-    theResult.pThicknessGap = theGeometry.GetGapThick();
-    G4double::getTape().registerInput(theResult.pThicknessGap);
-    theGeometry.SetGapThick(theResult.pThicknessGap);
+    const int nLayers = theGeometry.GetNumLayers();
+    const auto& absVec = theGeometry.GetAbsThickVec();
+    const auto& gapVec = theGeometry.GetGapThickVec();
+    theResult.pThicknessAbsorber.resize(nLayers);
+    theResult.pThicknessGap.resize(nLayers);
+    for (int i = 0; i < nLayers; ++i) {
+      theResult.pThicknessAbsorber[i] = absVec[i];
+      G4double::getTape().registerInput(theResult.pThicknessAbsorber[i]);
+      theResult.pThicknessGap[i] = gapVec[i];
+      G4double::getTape().registerInput(theResult.pThicknessGap[i]);
+    }
+    theGeometry.SetAbsThickPerLayer(theResult.pThicknessAbsorber);
+    theGeometry.SetGapThickPerLayer(theResult.pThicknessGap);
     theResult.pParticleEnergy = thePrimaryGenerator.GetKinEnergy();
     G4double::getTape().registerInput(theResult.pParticleEnergy);
     thePrimaryGenerator.SetKinEnergy(theResult.pParticleEnergy);
@@ -194,7 +199,8 @@ void EventLoop::EndOfEventAction(Results& theResult, int eventID) {
   theResult.fEdepAbs2 += dum*dum;
 
   theResult.fEdepPerLayer.Add(&theResult.fEdepPerLayer_CurrentEvent);
-  for(int i=0; i<50; i++){
+  const int numLayers = (int)theResult.fEdepPerLayer_Acc.size();
+  for(int i=0; i<numLayers; i++){
     const double val = GET_VALUE(theResult.fEdepPerLayer_CurrentEvent.GetY()[i]);
     theResult.fEdepPerLayer_Acc[i].add(val);
     theResult.fEdepPerLayer_Raw.push_back(val);
@@ -241,9 +247,13 @@ void EventLoop::EndOfEventAction(Results& theResult, int eventID) {
     for(int i=0; i<50; i++){
        theResult.fEdepPerLayer_CurrentEvent.GetY()[i].setGradient(theResult.barEdep[i]);
     }
+    theResult.barThicknessAbsorber.resize(theResult.pThicknessAbsorber.size());
+    theResult.barThicknessGap.resize(theResult.pThicknessGap.size());
     G4double::getTape().evaluate();
-    theResult.barThicknessAbsorber.add( theResult.pThicknessAbsorber.getGradient() );
-    theResult.barThicknessGap.add( theResult.pThicknessGap.getGradient() );
+    for (int i = 0; i < (int)theResult.pThicknessAbsorber.size(); ++i) {
+      theResult.barThicknessAbsorber[i].add(theResult.pThicknessAbsorber[i].getGradient());
+      theResult.barThicknessGap[i].add(theResult.pThicknessGap[i].getGradient());
+    }
     theResult.barParticleEnergy.add( theResult.pParticleEnergy.getGradient() );
   #endif
 }
