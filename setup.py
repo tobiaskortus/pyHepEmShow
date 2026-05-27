@@ -78,4 +78,7 @@ class CMakeBuildExt(_BuildExt):
 setup(
     cmdclass={"build_ext": CMakeBuildExt},
     ext_modules=[Extension("pyhepemshow", sources=[])],
+    packages=["hepemshow"],
+    package_data={"hepemshow": ["data/hepem_data.json"]},
+    include_package_data=True,
 )
