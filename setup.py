@@ -8,6 +8,7 @@ import tomllib
 
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext as _BuildExt
+from setuptools.command.build_py import build_py as _BuildPy
 
 VARIANT = "msc_no_ad_fix_yes"
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -72,18 +73,20 @@ def _ensure_built():
     return _so_files()
 
 
+class CMakeBuildPy(_BuildPy):
+    """Stage the JSON data file into the source tree before build_py collects package_data."""
+    def run(self):
+        src_json = os.path.join(ROOT, "hepemshow", "data", "hepem_data.json")
+        dst_dir = os.path.join(ROOT, "pyhepemshow", "data")
+        os.makedirs(dst_dir, exist_ok=True)
+        shutil.copy2(src_json, os.path.join(dst_dir, "hepem_data.json"))
+        super().run()
+
+
 class CMakeBuildExt(_BuildExt):
     def run(self):
         so_files = _ensure_built()
         libs = _g4hepem_libs()
-
-        # Ensure pyhepemshow/data has the json data file
-        pkg_data_dir = os.path.join(ROOT, "pyhepemshow", "data")
-        os.makedirs(pkg_data_dir, exist_ok=True)
-        src_json = os.path.join(ROOT, "hepemshow", "data", "hepem_data.json")
-        dst_json = os.path.join(pkg_data_dir, "hepem_data.json")
-        if os.path.isfile(src_json) and not os.path.isfile(dst_json):
-            shutil.copy2(src_json, dst_json)
 
         # Copy the extension and shared libs into the pyhepemshow package directory
         pkg_src_dir = os.path.join(ROOT, "pyhepemshow")
@@ -98,7 +101,7 @@ class CMakeBuildExt(_BuildExt):
 
 
 setup(
-    cmdclass={"build_ext": CMakeBuildExt},
+    cmdclass={"build_py": CMakeBuildPy, "build_ext": CMakeBuildExt},
     ext_modules=[Extension("pyhepemshow.hepemshow", sources=[])],
     packages=["pyhepemshow"],
     package_data={"pyhepemshow": ["data/hepem_data.json", "*.dylib", "*.so", "*.so.*"]},
