@@ -67,6 +67,14 @@ class CMakeBuildExt(_BuildExt):
         so_files = _ensure_built()
         libs = _g4hepem_libs()
 
+        # Ensure pyhepemshow/data has the json data file
+        pkg_data_dir = os.path.join(ROOT, "pyhepemshow", "data")
+        os.makedirs(pkg_data_dir, exist_ok=True)
+        src_json = os.path.join(ROOT, "hepemshow", "data", "hepem_data.json")
+        dst_json = os.path.join(pkg_data_dir, "hepem_data.json")
+        if os.path.isfile(src_json) and not os.path.isfile(dst_json):
+            shutil.copy2(src_json, dst_json)
+
         for f in so_files + libs:
             shutil.copy2(f, ROOT)
 
@@ -78,7 +86,7 @@ class CMakeBuildExt(_BuildExt):
 setup(
     cmdclass={"build_ext": CMakeBuildExt},
     ext_modules=[Extension("pyhepemshow", sources=[])],
-    packages=["hepemshow"],
-    package_data={"hepemshow": ["data/hepem_data.json"]},
+    packages=["pyhepemshow"],
+    package_data={"pyhepemshow": ["data/hepem_data.json"]},
     include_package_data=True,
 )
