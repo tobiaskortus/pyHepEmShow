@@ -42,38 +42,15 @@
 #include "accumulator.hh"
 
 /**
- * Data that needs to be accumulated during one `event` (the scope is one event):
- * - at the beginning of an `event`: usually reset (to zero)
- * - at the end of an `event`: usually written to the run scope data (see the
- *   `Results` below)
- */
-struct ResultsPerEvent {
-  G4double fEdepAbs       { 0.0 }; ///< energy deposit in the absorber during one event
-  G4double fEdepGap       { 0.0 }; ///< energy deposit in the gap during one event
-  //
-  G4double fNumSecGamma   { 0.0 }; ///< number of seconday \f$\gamma\f$ particles generated during one event
-  G4double fNumSecElectron{ 0.0 }; ///< number of seconday \f$e^-\f$ particles generated during one event
-  G4double fNumSecPositron{ 0.0 }; ///< number of seconday \f$e^+\f$ particles generated during one event
-  //
-  G4double fNumStepsGamma { 0.0 }; ///< number of \f$\gamma\f$ simulation steps during one event
-  G4double fNumStepsElPos { 0.0 }; ///< number of \f$e^-/e^+\f$ simulation steps during one event
-};
-
-
-/**
- * Data that are collected during the entire `run` of the simulation:
- * - at the beginning of the `ru`n: need to be initialised
- * - at the end of an `run`: written out (to file or to the std output)
+ * Data that are collected during the entire `run` of the simulation.
  * Mean quantities are computed over the simulated events.
  */
 struct Results {
-  Hist fEdepPerLayer;              ///< mean energy deposit per-layer histogram
-  Hist fEdepPerLayer_CurrentEvent;       ///< mean energy deposit per-layer histogram, current event
-  std::vector<Accumulator<double>> fEdepPerLayer_Acc;
-  std::vector<double> fEdepPerLayer_Raw; ///< raw per-event per-layer energy deposits, flat row-major [events*50]
+  Hist fEdepPerLayer_CurrentEvent;  ///< per-layer energy deposit accumulator for the current event
+  std::vector<double> fEdepPerLayer; ///< per-event per-layer energy deposits, flat row-major [events*layers]
+  std::vector<double> fParticleEnergy; ///< per-event primary particle kinetic energy [MeV]
   #ifdef CODI_FORWARD
-    std::vector<Accumulator<double>> fEdepPerLayer_AccD;
-    std::vector<double> fEdepPerLayer_RawD; ///< raw per-event per-layer dot values, flat row-major [events*50]
+    std::vector<double> fEdepPerLayerD; ///< per-event per-layer dot values, flat row-major [events*layers]
   #endif
   #ifdef CODI_REVERSE
     std::vector<double> barEdep; ///< Bar values of the edeps, to be set in the beginning.
@@ -82,32 +59,6 @@ struct Results {
     std::vector<G4double> pThicknessAbsorber, pThicknessGap; ///< Per-layer copies of the thickness variables used as AD inputs.
     G4double pParticleEnergy; ///< Copy of the particle energy variable used as AD input.
   #endif
-  Hist fGammaTrackLenghtPerLayer;  ///< mean number of \f$\gamma\f$ steps per-layer histogram
-  Hist fElPosTrackLenghtPerLayer;  ///< mean number of \f$e^-/e^+\f$ steps per-layer histogram
-  //
-  G4double fEdepAbs        { 0.0 };  ///< mean energy deposit in the `absorber`
-  G4double fEdepAbs2       { 0.0 };  ///< mean of the squared energy deposit in the `absorber`
-  G4double fEdepGap        { 0.0 };  ///< mean energy deposit in the `gap`
-  G4double fEdepGap2       { 0.0 };  ///< mean of the squared energy deposit in the `gap`
-  //
-  G4double fNumSecGamma    { 0.0 };  ///< mean number of the produced secondary \f$\gamma\f$ particles
-  G4double fNumSecGamma2   { 0.0 };  ///< mean of the squared number of produced secondary \f$\gamma\f$ particles
-  G4double fNumSecElectron { 0.0 };  ///< mean number of the produced secondary \f$e^-\f$ particles
-  G4double fNumSecElectron2{ 0.0 };  ///< mean of the squared number of produced secondary \f$e^-\f$ particles
-  G4double fNumSecPositron { 0.0 };  ///< mean number of the produced secondary \f$e^+\f$ particles
-  G4double fNumSecPositron2{ 0.0 };  ///< mean of the squared number of produced secondary \f$e^+\f$ particles
-  //
-  G4double fNumStepsGamma  { 0.0 };  ///< mean number of \f$\gamma\f$ steps in the entire calorimeter
-  G4double fNumStepsGamma2 { 0.0 };  ///< mean of the squared number of \f$\gamma\f$ steps in the entire calorimeter
-  G4double fNumStepsElPos  { 0.0 };  ///< mean number of \f$e^-/e^+\f$ steps in the entire calorimeter
-  G4double fNumStepsElPos2 { 0.0 };  ///< mean of the squared number of \f$e^-/e^+\f$ steps in the entire calorimeter
-  ResultsPerEvent fPerEventRes;    ///< data structure to accumulate results during a single event
 };
-
-/** Writes the final results of the simulation.
- *
- * Writes the 3 histrograms (mean energy deposit, \f$\gamma\f$ and \f$e^-/e^+\f$ steps per-layer) into files
- * while all the other collected data to the screen.*/
-void WriteResults(struct Results& res, int numEvents=1);
 
 #endif // RESULTS_HH

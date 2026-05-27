@@ -1,6 +1,7 @@
 #include "ad_type.h"
 
 #include "EventLoop.hh"
+#include "URandom.hh"
 
 #include "G4HepEmTLData.hh"
 #include "G4HepEmState.hh"
@@ -18,7 +19,8 @@
 #include <iostream>
 
 
-void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity) {
+void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity,
+                              double particle_energy_min, double particle_energy_max, URandom* theURnd) {
   //
   // first create the container for the tracks, i.e. the track-stack:
   // - before and at the end of a given event processing: empty
@@ -67,6 +69,17 @@ void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, 
     BeginOfEventAction(theResult, eventID, primaryTrack, theGeometry, thePrimaryGenerator);
 
     // Continuation of 1.:
+    double sampledEnergy;
+    if (particle_energy_max > particle_energy_min) {
+      sampledEnergy = particle_energy_min
+                      + (particle_energy_max - particle_energy_min) * GET_VALUE(theURnd->flat());
+    } else {
+      sampledEnergy = particle_energy_min;
+    }
+    G4double energyG4 = sampledEnergy;
+    thePrimaryGenerator.SetKinEnergy(energyG4);
+    theResult.fParticleEnergy.push_back(sampledEnergy);
+
     thePrimaryGenerator.GenerateOne(primaryTrack);
     primaryTrack.SetID(theTrackStack.GetNextTrackID());
     //
@@ -176,16 +189,6 @@ void EventLoop::BeginOfEventAction(Results& theResult, int eventID, const G4HepE
     thePrimaryGenerator.SetKinEnergy(theResult.pParticleEnergy);
   #endif
 
-  theResult.fPerEventRes.fEdepAbs        = 0.0;
-  theResult.fPerEventRes.fEdepGap        = 0.0;
-
-  theResult.fPerEventRes.fNumSecGamma    = 0.0;
-  theResult.fPerEventRes.fNumSecElectron = 0.0;
-  theResult.fPerEventRes.fNumSecPositron = 0.0;
-
-  theResult.fPerEventRes.fNumStepsGamma  = 0.0;
-  theResult.fPerEventRes.fNumStepsElPos  = 0.0;
-
   for(int i=0; i<50; i++){
     theResult.fEdepPerLayer_CurrentEvent.GetY()[i] = 0.;
   }
@@ -193,51 +196,17 @@ void EventLoop::BeginOfEventAction(Results& theResult, int eventID, const G4HepE
 }
 
 void EventLoop::EndOfEventAction(Results& theResult, int eventID) {
-  // propagare the data accunulated during this event to the results
-  G4double dum = theResult.fPerEventRes.fEdepAbs;
-  theResult.fEdepAbs  += dum;
-  theResult.fEdepAbs2 += dum*dum;
-
-  theResult.fEdepPerLayer.Add(&theResult.fEdepPerLayer_CurrentEvent);
-  const int numLayers = (int)theResult.fEdepPerLayer_Acc.size();
+  const int numLayers = theResult.fEdepPerLayer_CurrentEvent.GetNumBins();
   for(int i=0; i<numLayers; i++){
     const double val = GET_VALUE(theResult.fEdepPerLayer_CurrentEvent.GetY()[i]);
-    theResult.fEdepPerLayer_Acc[i].add(val);
-    theResult.fEdepPerLayer_Raw.push_back(val);
+    theResult.fEdepPerLayer.push_back(val);
     #if CODI_FORWARD
     {
       const double dotval = GET_DOTVALUE(theResult.fEdepPerLayer_CurrentEvent.GetY()[i]);
-      theResult.fEdepPerLayer_AccD[i].add(dotval);
-      theResult.fEdepPerLayer_RawD.push_back(dotval);
+      theResult.fEdepPerLayerD.push_back(dotval);
     }
     #endif
   }
-
-  dum = theResult.fPerEventRes.fEdepGap;
-  theResult.fEdepGap  += dum;
-  theResult.fEdepGap2 += dum*dum;
-
-
-  dum = theResult.fPerEventRes.fNumSecGamma;
-  theResult.fNumSecGamma  += dum;
-  theResult.fNumSecGamma2 += dum*dum;
-
-  dum = theResult.fPerEventRes.fNumSecElectron;
-  theResult.fNumSecElectron  += dum;
-  theResult.fNumSecElectron2 += dum*dum;
-
-  dum = theResult.fPerEventRes.fNumSecPositron;
-  theResult.fNumSecPositron  += dum;
-  theResult.fNumSecPositron2 += dum*dum;
-
-
-  dum = theResult.fPerEventRes.fNumStepsGamma;
-  theResult.fNumStepsGamma  += dum;
-  theResult.fNumStepsGamma2 += dum*dum;
-
-  dum = theResult.fPerEventRes.fNumStepsElPos;
-  theResult.fNumStepsElPos  += dum;
-  theResult.fNumStepsElPos2 += dum*dum;
 
   #ifdef CODI_REVERSE
     for(int i=0; i<50; i++){
@@ -259,19 +228,7 @@ void EventLoop::EndOfEventAction(Results& theResult, int eventID) {
 }
 
 
-void EventLoop::BeginOfTrackingAction(Results& theResult, G4HepEmTrack& theTrack) {
-  // check if this track is a secondary (parent ID > -1) then its type (based on the charge)
-  if (theTrack.GetParentID() > -1) {
-    const int ich = GET_VALUE(theTrack.GetCharge());
-    switch (ich) {
-      case  0: theResult.fPerEventRes.fNumSecGamma    += 1.0;
-               break;
-      case -1: theResult.fPerEventRes.fNumSecElectron += 1.0;
-               break;
-      default: theResult.fPerEventRes.fNumSecPositron += 1.0;
-               break;
-    }
-  }
+void EventLoop::BeginOfTrackingAction(Results& /*theResult*/, G4HepEmTrack& /*theTrack*/) {
 }
 
 

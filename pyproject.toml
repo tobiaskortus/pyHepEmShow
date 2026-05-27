@@ -9,3 +9,8 @@ requires-python = ">=3.8"
 
 [tool.setuptools]
 py-modules = []
+
+[tool.pyhepemshow]
+# Build type passed to CMake for the hepemshow extension.
+# Either: "Debug" or "Release"
+build_type = "Release"

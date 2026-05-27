@@ -84,17 +84,17 @@ find_package(nanobind CONFIG REQUIRED)
 # Build target(s):
 #
 # The Python extension module (replaces the HepEmShow executable):
-nanobind_add_module(pyhepemshow
+nanobind_add_module(hepemshow
   ${CMAKE_SOURCE_DIR}/HepEmShow.cc
   ${sources_SIM}
 )
 
-target_include_directories(pyhepemshow
+target_include_directories(hepemshow
   PRIVATE
   ${CMAKE_SOURCE_DIR}/Simulation/include/
 )
 
-target_link_libraries(pyhepemshow
+target_link_libraries(hepemshow
   PRIVATE
   G4HepEm::g4HepEmData
   G4HepEm::g4HepEmDataJsonIO

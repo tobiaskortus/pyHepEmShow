@@ -24,6 +24,7 @@ class G4HepEmTrack;
 class PrimaryGenerator;
 class Geometry;
 class Results;
+class URandom;
 
 class EventLoop {
 
@@ -49,7 +50,9 @@ public:
    * @param numEventToSimulate number of events required to be simulated
    * @param verbosity to control the verbosity of printouts reporting progress and state of the event processing
    */
-  static void ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity);
+  static void ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity,
+                            double particle_energy_min, double particle_energy_max,
+                            URandom* theURnd);
 
 private:
   EventLoop() = delete;

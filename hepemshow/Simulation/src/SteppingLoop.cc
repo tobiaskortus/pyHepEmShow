@@ -307,30 +307,12 @@ void SteppingLoop::StackSecondaries(G4HepEmTLData& theTLData, TrackStack& theTra
 }
 
 
-void SteppingLoop::SteppingAction(Results& theResult, const G4HepEmTrack& theTrack, const Box* /*currentVolume*/, G4double currentPhysStepLength, int indxLayer, int indxAbsorber, int /*eventID*/, int /*stepID*/) {
+void SteppingLoop::SteppingAction(Results& theResult, const G4HepEmTrack& theTrack, const Box* /*currentVolume*/, G4double /*currentPhysStepLength*/, int indxLayer, int /*indxAbsorber*/, int /*eventID*/, int /*stepID*/) {
   if (indxLayer < 0) return;
   //
   const G4double edep = theTrack.GetEnergyDeposit();
   if (edep > 0.0) {
     theResult.fEdepPerLayer_CurrentEvent.Fill(indxLayer, edep);
-    switch (indxAbsorber) {
-      case 0: theResult.fPerEventRes.fEdepAbs += edep;
-              break;
-      case 1: theResult.fPerEventRes.fEdepGap += edep;
-              break;
-      default: //
-              break;
-    }
-  }
-
-  //
-  if (currentPhysStepLength <= 0.0) return;
-  if (theTrack.GetCharge() == 0.0) {
-    theResult.fGammaTrackLenghtPerLayer.Fill(indxLayer, currentPhysStepLength);
-    theResult.fPerEventRes.fNumStepsGamma += 1.0;
-  } else {
-    theResult.fElPosTrackLenghtPerLayer.Fill(indxLayer, currentPhysStepLength);
-    theResult.fPerEventRes.fNumStepsElPos += 1.0;
   }
 }
 

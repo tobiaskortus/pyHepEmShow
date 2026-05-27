@@ -4,6 +4,8 @@ import subprocess
 import glob
 import shutil
 import sysconfig
+import tomllib
+
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext as _BuildExt
 
@@ -13,9 +15,13 @@ BUILD_DIR = os.path.join(ROOT, "hepemshow", f"build_{VARIANT}")
 G4HEPEM_INSTALL = os.path.join(ROOT, "externals", "g4hepem", f"install_{VARIANT}")
 
 
+with open(os.path.join(ROOT, "pyproject.toml"), "rb") as _f:
+    BUILD_TYPE = tomllib.load(_f)["tool"]["pyhepemshow"]["build_type"]
+
+
 def _so_files():
     ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
-    return glob.glob(os.path.join(BUILD_DIR, f"pyhepemshow*{ext_suffix}"))
+    return glob.glob(os.path.join(BUILD_DIR, f"hepemshow*{ext_suffix}"))
 
 
 def _g4hepem_libs():
@@ -53,12 +59,16 @@ def _ensure_built():
     if not os.path.isdir(BUILD_DIR):
         script = os.path.join(ROOT, "externals", "configure.sh")
         subprocess.run(
-            ["bash", script, VARIANT, "", sys.executable],
+            ["bash", script, VARIANT, "", sys.executable, BUILD_TYPE],
             check=True, cwd=ROOT,
         )
-    # Subsequent times: just build (make)
+    # Subsequent times: update build type then make
     else:
-        subprocess.run(["make", "-j", "pyhepemshow"], check=True, cwd=BUILD_DIR)
+        subprocess.run(
+            ["cmake", ".", f"-DCMAKE_BUILD_TYPE={BUILD_TYPE}"],
+            check=True, cwd=BUILD_DIR,
+        )
+        subprocess.run(["make", "-j", "hepemshow"], check=True, cwd=BUILD_DIR)
     return _so_files()
 
 
@@ -75,18 +85,22 @@ class CMakeBuildExt(_BuildExt):
         if os.path.isfile(src_json) and not os.path.isfile(dst_json):
             shutil.copy2(src_json, dst_json)
 
+        # Copy the extension and shared libs into the pyhepemshow package directory
+        pkg_src_dir = os.path.join(ROOT, "pyhepemshow")
+        os.makedirs(pkg_src_dir, exist_ok=True)
         for f in so_files + libs:
-            shutil.copy2(f, ROOT)
+            shutil.copy2(f, pkg_src_dir)
 
-        os.makedirs(self.build_lib, exist_ok=True)
+        build_lib_pkg = os.path.join(self.build_lib, "pyhepemshow")
+        os.makedirs(build_lib_pkg, exist_ok=True)
         for f in so_files + libs:
-            shutil.copy2(f, self.build_lib)
+            shutil.copy2(f, build_lib_pkg)
 
 
 setup(
     cmdclass={"build_ext": CMakeBuildExt},
-    ext_modules=[Extension("pyhepemshow", sources=[])],
+    ext_modules=[Extension("pyhepemshow.hepemshow", sources=[])],
     packages=["pyhepemshow"],
-    package_data={"pyhepemshow": ["data/hepem_data.json"]},
+    package_data={"pyhepemshow": ["data/hepem_data.json", "*.dylib", "*.so", "*.so.*"]},
     include_package_data=True,
 )

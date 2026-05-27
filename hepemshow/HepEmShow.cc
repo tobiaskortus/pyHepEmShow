@@ -36,15 +36,15 @@ nb::dict run_simulation(
     const std::vector<double>& gap_thickness          = {},
     double                     transverse_size        = 400.0,
     const std::string&         particle               = "e-",
-    double                     particle_energy        = 10000.0,
+    double                     particle_energy_min    = 10000.0,
+    double                     particle_energy_max    = 10000.0,
     int                        num_events             = 1000,
     double                     random_seed            = 1234.0,
     int                        verbosity              = 1,
     const std::vector<double>& bar_edep               = {},
     // CODI_FORWARD tangent seeds (per-layer or empty for zero; ignored in non-AD builds)
     const std::vector<double>& absorber_thickness_dot = {},
-    const std::vector<double>& gap_thickness_dot      = {},
-    double                     particle_energy_dot    = 0.0)
+    const std::vector<double>& gap_thickness_dot      = {})
 {
   // Derive number of layers from the thickness vectors
   if (absorber_thickness.size() != gap_thickness.size())
@@ -93,24 +93,16 @@ nb::dict run_simulation(
 
   PrimaryGenerator thePrimaryGenerator;
   thePrimaryGenerator.SetCharge((particle == "e-") ? -1.0 : (particle == "gamma" ? 0.0 : +1.0));
-  {
-    G4double pEnergy = particle_energy;
-#if CODI_FORWARD
-    SET_DOTVALUE(pEnergy, particle_energy_dot);
-#endif
-    thePrimaryGenerator.SetKinEnergy(pEnergy);
-  }
   thePrimaryGenerator.SetPosition(theGeometry.GetPrimaryXposition(), 0.0, 0.0);
   thePrimaryGenerator.SetDirection(1.0, 0.0, 0.0);
+  thePrimaryGenerator.SetKinEnergy(particle_energy_min);
 
   Results theResult;
-  theResult.fEdepPerLayer.ReSet("hist_Edep_PerLayer", 0, num_layers, num_layers);
   theResult.fEdepPerLayer_CurrentEvent.ReSet("hist_Edep_PerLayer_CurrentEvent", 0, num_layers, num_layers);
-  theResult.fEdepPerLayer_Acc.resize(num_layers);
-  theResult.fEdepPerLayer_Raw.reserve(num_events * num_layers);
+  theResult.fEdepPerLayer.reserve(num_events * num_layers);
+  theResult.fParticleEnergy.reserve(num_events);
 #if CODI_FORWARD
-  theResult.fEdepPerLayer_AccD.resize(num_layers);
-  theResult.fEdepPerLayer_RawD.reserve(num_events * num_layers);
+  theResult.fEdepPerLayerD.reserve(num_events * num_layers);
 #endif
 #ifdef CODI_REVERSE
   theResult.barEdep.resize(num_layers, 0.0);
@@ -119,11 +111,9 @@ nb::dict run_simulation(
   theResult.barThicknessAbsorber.resize(num_layers);
   theResult.barThicknessGap.resize(num_layers);
 #endif
-  theResult.fGammaTrackLenghtPerLayer.ReSet("hist_GamTrackL_PerLayer", 0, num_layers, num_layers);
-  theResult.fElPosTrackLenghtPerLayer.ReSet("hist_ElPosTrackL_PerLayer", 0, num_layers, num_layers);
-
   EventLoop::ProcessEvents(*theTLData, *theState, thePrimaryGenerator, theGeometry,
-                           theResult, num_events, verbosity);
+                           theResult, num_events, verbosity,
+                           particle_energy_min, particle_energy_max, theURnd);
 
   delete theRandomEngine;
   delete theURnd;
@@ -140,10 +130,20 @@ nb::dict run_simulation(
     return nb::ndarray<nb::numpy, double, nb::ndim<2>>(heap->data(), 2, shape, owner);
   };
 
+  auto to_numpy1d = [num_events](std::vector<double> v) {
+    auto* heap = new std::vector<double>(std::move(v));
+    nb::capsule owner(heap, [](void* p) noexcept {
+      delete static_cast<std::vector<double>*>(p);
+    });
+    size_t shape[1] = {(size_t)num_events};
+    return nb::ndarray<nb::numpy, double, nb::ndim<1>>(heap->data(), 1, shape, owner);
+  };
+
   nb::dict result;
-  result["edep_per_layer"] = to_numpy2d(std::move(theResult.fEdepPerLayer_Raw));
+  result["edep_per_layer"] = to_numpy2d(std::move(theResult.fEdepPerLayer));
+  result["particle_energies"] = to_numpy1d(std::move(theResult.fParticleEnergy));
 #if CODI_FORWARD
-  result["edep_per_layer_dot"] = to_numpy2d(std::move(theResult.fEdepPerLayer_RawD));
+  result["edep_per_layer_dot"] = to_numpy2d(std::move(theResult.fEdepPerLayerD));
 #endif
 #ifdef CODI_REVERSE
   auto bar = [](const Accumulator<double>& a) -> nb::dict {
@@ -164,19 +164,19 @@ nb::dict run_simulation(
 }
 
 
-NB_MODULE(pyhepemshow, m) {
+NB_MODULE(hepemshow, m) {
   m.def("run_simulation", &run_simulation,
     nb::arg("data_file"),
     nb::arg("absorber_thickness") = std::vector<double>(50, 2.3),
     nb::arg("gap_thickness")      = std::vector<double>(50, 5.7),
     nb::arg("transverse_size")    = 400.0,
     nb::arg("particle")           = "e-",
-    nb::arg("particle_energy")    = 10000.0,
+    nb::arg("particle_energy_min") = 10000.0,
+    nb::arg("particle_energy_max") = 10000.0,
     nb::arg("num_events")         = 1000,
     nb::arg("random_seed")        = 1234.0,
     nb::arg("verbosity")          = 1,
     nb::arg("bar_edep")           = std::vector<double>{},
     nb::arg("absorber_thickness_dot") = std::vector<double>{},
-    nb::arg("gap_thickness_dot")      = std::vector<double>{},
-    nb::arg("particle_energy_dot")    = 0.0);
+    nb::arg("gap_thickness_dot")      = std::vector<double>{});
 }

@@ -2,6 +2,7 @@
 PREFIX=$1
 FLAGS="$2"
 PYTHON_EXE="${3:-python}"   # optional 3rd arg: path to Python executable
+BUILD_TYPE="${4:-Release}"  # optional 4th arg: CMake build type (Debug/Release/…)
 
 # Always run relative to the externals/ directory
 cd "$(dirname "$0")"
@@ -24,9 +25,8 @@ cd       build_$PREFIX
 cmake .. \
  -DG4HepEm_GEANT4_BUILD=OFF \
  -DCMAKE_INSTALL_PREFIX=$PWD/../install_$PREFIX \
- -DCMAKE_BUILD_TYPE=Debug -DCODI_FORWARD=yes \
+ -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCODI_FORWARD=yes \
  -DCoDiPack_DIR=$PWD/../../CoDiPack/cmake \
- -DCMAKE_CXX_FLAGS_DEBUG="-O0 -g3 -ggdb3 -fno-omit-frame-pointer -fno-inline" \
  -DCMAKE_CXX_FLAGS="$FLAGS" \
  $RPATH_FLAGS
 
@@ -38,10 +38,9 @@ mkdir -p build_$PREFIX
 cd       build_$PREFIX
 cmake .. \
   -DG4HepEm_DIR=$PWD/../../externals/g4hepem/install_$PREFIX/$LIB_DIR/cmake/G4HepEm/ \
-  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DCODI_FORWARD=yes \
   -DCoDiPack_DIR=$PWD/../../externals/CoDiPack/cmake \
-  -DCMAKE_CXX_FLAGS_DEBUG="-O0 -g3 -ggdb3 -fno-omit-frame-pointer -fno-inline" \
   -DCMAKE_CXX_FLAGS="$FLAGS" \
   -DPython_EXECUTABLE="$PYTHON_EXE" \
   $RPATH_FLAGS
