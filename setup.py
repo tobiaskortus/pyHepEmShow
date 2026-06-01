@@ -143,9 +143,16 @@ def _build_mode(ad_mode):
 class CMakeBuildExt(_BuildExt):
     def run(self):
         src_json = os.path.join(ROOT, "hepemshow", "data", "hepem_data.json")
+
+        # Copy to source tree (editable installs)
         dst_dir = os.path.join(ROOT, "pyhepemshow", "data")
         os.makedirs(dst_dir, exist_ok=True)
         shutil.copy2(src_json, os.path.join(dst_dir, "hepem_data.json"))
+
+        # Copy to build_lib (regular/pip installs)
+        build_lib_data_dir = os.path.join(self.build_lib, "pyhepemshow", "data")
+        os.makedirs(build_lib_data_dir, exist_ok=True)
+        shutil.copy2(src_json, os.path.join(build_lib_data_dir, "hepem_data.json"))
 
         for ad_mode in MODES:
             so_files = _build_mode(ad_mode)
