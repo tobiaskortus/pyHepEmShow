@@ -29,6 +29,10 @@
 
 namespace nb = nanobind;
 
+#ifndef PYHEPEMSHOW_MODULE_NAME
+#define PYHEPEMSHOW_MODULE_NAME _core
+#endif
+
 
 nb::dict run_simulation(
     const std::string&         data_file,
@@ -64,6 +68,18 @@ nb::dict run_simulation(
     throw std::runtime_error(
       "run_simulation: gap_thickness_dot must be empty or match the number of layers "
       "(" + std::to_string(num_layers) + "), got " + std::to_string(gap_thickness_dot.size()));
+
+#ifdef CODI_REVERSE
+  const std::size_t num_layers_sz = static_cast<std::size_t>(num_layers);
+  const std::size_t num_events_sz = static_cast<std::size_t>(num_events);
+  const std::size_t event_layer_size = num_events_sz * num_layers_sz;
+  if (!bar_edep.empty() && bar_edep.size() != num_layers_sz && bar_edep.size() != event_layer_size) {
+    throw std::runtime_error(
+      "run_simulation: bar_edep must be empty, per-layer (" + std::to_string(num_layers_sz) +
+      "), or per-event-per-layer (" + std::to_string(event_layer_size) + "), got " +
+      std::to_string(bar_edep.size()));
+  }
+#endif
 
   std::ifstream jsonIS(data_file.c_str());
   if (!jsonIS.is_open())
@@ -105,9 +121,9 @@ nb::dict run_simulation(
   theResult.fEdepPerLayerD.reserve(num_events * num_layers);
 #endif
 #ifdef CODI_REVERSE
-  theResult.barEdep.resize(num_layers, 0.0);
-  for (std::size_t i = 0; i < bar_edep.size() && i < (std::size_t)num_layers; ++i)
-    theResult.barEdep[i] = bar_edep[i];
+  theResult.barEdep = bar_edep.empty()
+    ? std::vector<double>(static_cast<std::size_t>(num_events) * static_cast<std::size_t>(num_layers), 0.0)
+    : bar_edep;
   theResult.barThicknessAbsorber.resize(num_layers);
   theResult.barThicknessGap.resize(num_layers);
 #endif
@@ -164,19 +180,27 @@ nb::dict run_simulation(
 }
 
 
-NB_MODULE(hepemshow, m) {
-  m.def("run_simulation", &run_simulation,
-    nb::arg("data_file"),
-    nb::arg("absorber_thickness") = std::vector<double>(50, 2.3),
-    nb::arg("gap_thickness")      = std::vector<double>(50, 5.7),
-    nb::arg("transverse_size")    = 400.0,
-    nb::arg("particle")           = "e-",
-    nb::arg("particle_energy_min") = 10000.0,
-    nb::arg("particle_energy_max") = 10000.0,
-    nb::arg("num_events")         = 1000,
-    nb::arg("random_seed")        = 1234.0,
-    nb::arg("verbosity")          = 1,
-    nb::arg("bar_edep")           = std::vector<double>{},
-    nb::arg("absorber_thickness_dot") = std::vector<double>{},
-    nb::arg("gap_thickness_dot")      = std::vector<double>{});
+NB_MODULE(PYHEPEMSHOW_MODULE_NAME, m) {
+  auto bind_run = [](nb::module_& target) {
+    target.def("run_simulation", &run_simulation,
+      nb::arg("data_file"),
+      nb::arg("absorber_thickness") = std::vector<double>(50, 2.3),
+      nb::arg("gap_thickness")      = std::vector<double>(50, 5.7),
+      nb::arg("transverse_size")    = 400.0,
+      nb::arg("particle")           = "e-",
+      nb::arg("particle_energy_min") = 10000.0,
+      nb::arg("particle_energy_max") = 10000.0,
+      nb::arg("num_events")         = 1000,
+      nb::arg("random_seed")        = 1234.0,
+      nb::arg("verbosity")          = 1,
+      nb::arg("bar_edep")           = std::vector<double>{},
+      nb::arg("absorber_thickness_dot") = std::vector<double>{},
+      nb::arg("gap_thickness_dot")      = std::vector<double>{});
+  };
+
+  m.attr("compiled_mode") = PYHEPEMSHOW_MODE_NAME;
+  bind_run(m);
+
+  nb::module_ mode_ns = m.def_submodule(PYHEPEMSHOW_MODE_NAME);
+  bind_run(mode_ns);
 }

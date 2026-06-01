@@ -189,7 +189,8 @@ void EventLoop::BeginOfEventAction(Results& theResult, int eventID, const G4HepE
     thePrimaryGenerator.SetKinEnergy(theResult.pParticleEnergy);
   #endif
 
-  for(int i=0; i<50; i++){
+  const int numLayers = theResult.fEdepPerLayer_CurrentEvent.GetNumBins();
+  for (int i = 0; i < numLayers; ++i) {
     theResult.fEdepPerLayer_CurrentEvent.GetY()[i] = 0.;
   }
 
@@ -209,12 +210,13 @@ void EventLoop::EndOfEventAction(Results& theResult, int eventID) {
   }
 
   #ifdef CODI_REVERSE
-    for(int i=0; i<50; i++){
+     for (int i = 0; i < numLayers; ++i) {
        G4double::getTape().registerOutput(theResult.fEdepPerLayer_CurrentEvent.GetY()[i]);
     }
     G4double::getTape().setPassive();
-    for(int i=0; i<50; i++){
-       theResult.fEdepPerLayer_CurrentEvent.GetY()[i].setGradient(theResult.barEdep[i]);
+     for (int i = 0; i < numLayers; ++i) {
+       std::size_t seedIdx = static_cast<std::size_t>(eventID) * static_cast<std::size_t>(numLayers) + static_cast<std::size_t>(i);
+       theResult.fEdepPerLayer_CurrentEvent.GetY()[i].setGradient(theResult.barEdep[seedIdx]);
     }
     theResult.barThicknessAbsorber.resize(theResult.pThicknessAbsorber.size());
     theResult.barThicknessGap.resize(theResult.pThicknessGap.size());

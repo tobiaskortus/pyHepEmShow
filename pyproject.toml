@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "nanobind"]
+requires = ["setuptools>=64", "nanobind", "tomli; python_version < '3.11'"]
 build-backend = "setuptools.build_meta"
 
 [project]

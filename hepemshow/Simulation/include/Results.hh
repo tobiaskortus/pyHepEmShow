@@ -53,7 +53,7 @@ struct Results {
     std::vector<double> fEdepPerLayerD; ///< per-event per-layer dot values, flat row-major [events*layers]
   #endif
   #ifdef CODI_REVERSE
-    std::vector<double> barEdep; ///< Bar values of the edeps, to be set in the beginning.
+    std::vector<double> barEdep; ///< Adjoint seed values, flat row-major [events*layers].
     std::vector<Accumulator<double>> barThicknessAbsorber, barThicknessGap; ///< Per-layer accumulated bar values of the absorber/gap thicknesses.
     Accumulator<double> barParticleEnergy; ///< Accumulated bar value of the particle energy.
     std::vector<G4double> pThicknessAbsorber, pThicknessGap; ///< Per-layer copies of the thickness variables used as AD inputs.

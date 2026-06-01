@@ -6,6 +6,8 @@ if(${CMAKE_VERSION} VERSION_LESS 3.12)
 endif()
 project(hepemshow)
 
+set(PYHEPEMSHOW_MODULE_NAME "_core" CACHE STRING "Python extension module target name")
+
 # Have linker set RPATH, not RUNPATH
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--disable-new-dtags")
 
@@ -84,21 +86,34 @@ find_package(nanobind CONFIG REQUIRED)
 # Build target(s):
 #
 # The Python extension module (replaces the HepEmShow executable):
-nanobind_add_module(hepemshow
+nanobind_add_module(${PYHEPEMSHOW_MODULE_NAME}
   ${CMAKE_SOURCE_DIR}/HepEmShow.cc
   ${sources_SIM}
 )
 
-target_include_directories(hepemshow
+target_include_directories(${PYHEPEMSHOW_MODULE_NAME}
   PRIVATE
   ${CMAKE_SOURCE_DIR}/Simulation/include/
 )
 
-target_link_libraries(hepemshow
+target_link_libraries(${PYHEPEMSHOW_MODULE_NAME}
   PRIVATE
   G4HepEm::g4HepEmData
   G4HepEm::g4HepEmDataJsonIO
 )
+
+target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME}
+  PRIVATE
+  PYHEPEMSHOW_MODULE_NAME=${PYHEPEMSHOW_MODULE_NAME}
+)
+
+if(CODI_FORWARD)
+  target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME} PRIVATE PYHEPEMSHOW_MODE_NAME="forward_ad")
+elseif(CODI_REVERSE)
+  target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME} PRIVATE PYHEPEMSHOW_MODE_NAME="reverse")
+else()
+  target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME} PRIVATE PYHEPEMSHOW_MODE_NAME="forward")
+endif()
 
 # The Data-Generation application: only if G4HepEm was built with Geant4
 if(G4HepEm_geant4_FOUND)
