@@ -183,7 +183,6 @@ nb::dict run_simulation(
 NB_MODULE(PYHEPEMSHOW_MODULE_NAME, m) {
   auto bind_run = [](nb::module_& target) {
     target.def("run_simulation", &run_simulation,
-      nb::call_guard<nb::gil_scoped_release>(),
       nb::arg("data_file"),
       nb::arg("absorber_thickness") = std::vector<double>(50, 2.3),
       nb::arg("gap_thickness")      = std::vector<double>(50, 5.7),
