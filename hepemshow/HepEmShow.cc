@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <mutex>
 
 namespace nb = nanobind;
 
@@ -86,6 +87,7 @@ nb::dict run_simulation(
   std::vector<double> res_edep_per_layer_dot;
 #endif
 #ifdef CODI_REVERSE
+  const std::vector<double> bar_edep_local = bar_edep;
   std::vector<double> res_bar_thickness_absorber;
   std::vector<double> res_bar_thickness_gap;
   double              res_bar_particle_energy_mean = 0.0;
@@ -94,6 +96,9 @@ nb::dict run_simulation(
 
   {
     nb::gil_scoped_release release;
+
+    static std::mutex tape_mutex;
+    std::lock_guard<std::mutex> tape_lock(tape_mutex);
 
     std::ifstream jsonIS(data_file.c_str());
     if (!jsonIS.is_open())
@@ -135,9 +140,9 @@ nb::dict run_simulation(
     theResult.fEdepPerLayerD.reserve(num_events * num_layers);
 #endif
 #ifdef CODI_REVERSE
-    theResult.barEdep = bar_edep.empty()
+    theResult.barEdep = bar_edep_local.empty()
       ? std::vector<double>(static_cast<std::size_t>(num_events) * static_cast<std::size_t>(num_layers), 0.0)
-      : bar_edep;
+      : bar_edep_local;
     theResult.barThicknessAbsorber.resize(num_layers);
     theResult.barThicknessGap.resize(num_layers);
 #endif
