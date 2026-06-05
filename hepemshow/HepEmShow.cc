@@ -80,62 +80,94 @@ nb::dict run_simulation(
       std::to_string(bar_edep.size()));
   }
 #endif
-
-  std::ifstream jsonIS(data_file.c_str());
-  if (!jsonIS.is_open())
-    throw std::runtime_error("run_simulation: cannot open data file: " + data_file);
-  G4HepEmState* theState = G4HepEmStateFromJson(jsonIS);
-
-  URandom*             theURnd         = new URandom(random_seed);
-  G4HepEmRandomEngine* theRandomEngine = new G4HepEmRandomEngine(theURnd);
-  G4HepEmTLData*       theTLData       = new G4HepEmTLData();
-  theTLData->SetRandomEngine(theRandomEngine);
-
-  Geometry theGeometry;
-  theGeometry.SetNumLayers(num_layers);
-  theGeometry.SetCaloSizeYZ(transverse_size);
-  {
-    std::vector<G4double> absThickVec(absorber_thickness.begin(), absorber_thickness.end());
-    std::vector<G4double> gapThickVec(gap_thickness.begin(), gap_thickness.end());
+  std::vector<double> res_edep_per_layer;
+  std::vector<double> res_particle_energy;
 #if CODI_FORWARD
-    if (!absorber_thickness_dot.empty())
-      for (int i = 0; i < num_layers; ++i) SET_DOTVALUE(absThickVec[i], absorber_thickness_dot[i]);
-    if (!gap_thickness_dot.empty())
-      for (int i = 0; i < num_layers; ++i) SET_DOTVALUE(gapThickVec[i], gap_thickness_dot[i]);
-#endif
-    theGeometry.SetAbsThickPerLayer(absThickVec);
-    theGeometry.SetGapThickPerLayer(gapThickVec);
-  }
-
-  PrimaryGenerator thePrimaryGenerator;
-  thePrimaryGenerator.SetCharge((particle == "e-") ? -1.0 : (particle == "gamma" ? 0.0 : +1.0));
-  thePrimaryGenerator.SetPosition(theGeometry.GetPrimaryXposition(), 0.0, 0.0);
-  thePrimaryGenerator.SetDirection(1.0, 0.0, 0.0);
-  thePrimaryGenerator.SetKinEnergy(particle_energy_min);
-
-  Results theResult;
-  theResult.fEdepPerLayer_CurrentEvent.ReSet("hist_Edep_PerLayer_CurrentEvent", 0, num_layers, num_layers);
-  theResult.fEdepPerLayer.reserve(num_events * num_layers);
-  theResult.fParticleEnergy.reserve(num_events);
-#if CODI_FORWARD
-  theResult.fEdepPerLayerD.reserve(num_events * num_layers);
+  std::vector<double> res_edep_per_layer_dot;
 #endif
 #ifdef CODI_REVERSE
-  theResult.barEdep = bar_edep.empty()
-    ? std::vector<double>(static_cast<std::size_t>(num_events) * static_cast<std::size_t>(num_layers), 0.0)
-    : bar_edep;
-  theResult.barThicknessAbsorber.resize(num_layers);
-  theResult.barThicknessGap.resize(num_layers);
+  std::vector<double> res_bar_thickness_absorber;
+  std::vector<double> res_bar_thickness_gap;
+  double              res_bar_particle_energy_mean = 0.0;
+  double              res_bar_particle_energy_var  = 0.0;
 #endif
-  EventLoop::ProcessEvents(*theTLData, *theState, thePrimaryGenerator, theGeometry,
-                           theResult, num_events, verbosity,
-                           particle_energy_min, particle_energy_max, theURnd);
 
-  delete theRandomEngine;
-  delete theURnd;
-  delete theTLData;
-  FreeG4HepEmData(theState->fData);
-  delete theState;
+  {
+    nb::gil_scoped_release release;
+
+    std::ifstream jsonIS(data_file.c_str());
+    if (!jsonIS.is_open())
+      throw std::runtime_error("run_simulation: cannot open data file: " + data_file);
+    G4HepEmState* theState = G4HepEmStateFromJson(jsonIS);
+
+    URandom*             theURnd         = new URandom(random_seed);
+    G4HepEmRandomEngine* theRandomEngine = new G4HepEmRandomEngine(theURnd);
+    G4HepEmTLData*       theTLData       = new G4HepEmTLData();
+    theTLData->SetRandomEngine(theRandomEngine);
+
+    Geometry theGeometry;
+    theGeometry.SetNumLayers(num_layers);
+    theGeometry.SetCaloSizeYZ(transverse_size);
+    {
+      std::vector<G4double> absThickVec(absorber_thickness.begin(), absorber_thickness.end());
+      std::vector<G4double> gapThickVec(gap_thickness.begin(), gap_thickness.end());
+#if CODI_FORWARD
+      if (!absorber_thickness_dot.empty())
+        for (int i = 0; i < num_layers; ++i) SET_DOTVALUE(absThickVec[i], absorber_thickness_dot[i]);
+      if (!gap_thickness_dot.empty())
+        for (int i = 0; i < num_layers; ++i) SET_DOTVALUE(gapThickVec[i], gap_thickness_dot[i]);
+#endif
+      theGeometry.SetAbsThickPerLayer(absThickVec);
+      theGeometry.SetGapThickPerLayer(gapThickVec);
+    }
+
+    PrimaryGenerator thePrimaryGenerator;
+    thePrimaryGenerator.SetCharge((particle == "e-") ? -1.0 : (particle == "gamma" ? 0.0 : +1.0));
+    thePrimaryGenerator.SetPosition(theGeometry.GetPrimaryXposition(), 0.0, 0.0);
+    thePrimaryGenerator.SetDirection(1.0, 0.0, 0.0);
+    thePrimaryGenerator.SetKinEnergy(particle_energy_min);
+
+    Results theResult;
+    theResult.fEdepPerLayer_CurrentEvent.ReSet("hist_Edep_PerLayer_CurrentEvent", 0, num_layers, num_layers);
+    theResult.fEdepPerLayer.reserve(num_events * num_layers);
+    theResult.fParticleEnergy.reserve(num_events);
+#if CODI_FORWARD
+    theResult.fEdepPerLayerD.reserve(num_events * num_layers);
+#endif
+#ifdef CODI_REVERSE
+    theResult.barEdep = bar_edep.empty()
+      ? std::vector<double>(static_cast<std::size_t>(num_events) * static_cast<std::size_t>(num_layers), 0.0)
+      : bar_edep;
+    theResult.barThicknessAbsorber.resize(num_layers);
+    theResult.barThicknessGap.resize(num_layers);
+#endif
+    EventLoop::ProcessEvents(*theTLData, *theState, thePrimaryGenerator, theGeometry,
+                             theResult, num_events, verbosity,
+                             particle_energy_min, particle_energy_max, theURnd);
+
+    delete theRandomEngine;
+    delete theURnd;
+    delete theTLData;
+    FreeG4HepEmData(theState->fData);
+    delete theState;
+
+    // Move data before GIL is re-acquired
+    res_edep_per_layer   = std::move(theResult.fEdepPerLayer);
+    res_particle_energy  = std::move(theResult.fParticleEnergy);
+#if CODI_FORWARD
+    res_edep_per_layer_dot = std::move(theResult.fEdepPerLayerD);
+#endif
+#ifdef CODI_REVERSE
+    res_bar_thickness_absorber.resize(num_layers);
+    res_bar_thickness_gap.resize(num_layers);
+    for (int i = 0; i < num_layers; ++i) {
+      res_bar_thickness_absorber[i] = theResult.barThicknessAbsorber[i].getMean();
+      res_bar_thickness_gap[i]      = theResult.barThicknessGap[i].getMean();
+    }
+    res_bar_particle_energy_mean = theResult.barParticleEnergy.getMean();
+    res_bar_particle_energy_var  = theResult.barParticleEnergy.getVar();
+#endif
+  } // GIL re-acquired here
 
   auto to_numpy2d = [num_events, num_layers](std::vector<double> v) {
     auto* heap = new std::vector<double>(std::move(v));
@@ -156,25 +188,24 @@ nb::dict run_simulation(
   };
 
   nb::dict result;
-  result["edep_per_layer"] = to_numpy2d(std::move(theResult.fEdepPerLayer));
-  result["particle_energies"] = to_numpy1d(std::move(theResult.fParticleEnergy));
+  result["edep_per_layer"]    = to_numpy2d(std::move(res_edep_per_layer));
+  result["particle_energies"] = to_numpy1d(std::move(res_particle_energy));
 #if CODI_FORWARD
-  result["edep_per_layer_dot"] = to_numpy2d(std::move(theResult.fEdepPerLayerD));
+  result["edep_per_layer_dot"] = to_numpy2d(std::move(res_edep_per_layer_dot));
 #endif
 #ifdef CODI_REVERSE
-  auto bar = [](const Accumulator<double>& a) -> nb::dict {
-    nb::dict d; d["mean"] = a.getMean(); d["var"] = a.getVar(); return d;
-  };
-  auto bar_vec = [num_layers](const std::vector<Accumulator<double>>& v) {
-    auto* heap = new std::vector<double>(num_layers);
-    for (int i = 0; i < num_layers; ++i) (*heap)[i] = v[i].getMean();
+  auto to_numpy1d_vec = [num_layers](std::vector<double> v) {
+    auto* heap = new std::vector<double>(std::move(v));
     nb::capsule owner(heap, [](void* p) noexcept { delete static_cast<std::vector<double>*>(p); });
     size_t shape[1] = {(size_t)num_layers};
     return nb::ndarray<nb::numpy, double, nb::ndim<1>>(heap->data(), 1, shape, owner);
   };
-  result["bar_thickness_absorber"] = bar_vec(theResult.barThicknessAbsorber);
-  result["bar_thickness_gap"]      = bar_vec(theResult.barThicknessGap);
-  result["bar_particle_energy"]    = bar(theResult.barParticleEnergy);
+  result["bar_thickness_absorber"] = to_numpy1d_vec(std::move(res_bar_thickness_absorber));
+  result["bar_thickness_gap"]      = to_numpy1d_vec(std::move(res_bar_thickness_gap));
+  nb::dict bar_pe;
+  bar_pe["mean"] = res_bar_particle_energy_mean;
+  bar_pe["var"]  = res_bar_particle_energy_var;
+  result["bar_particle_energy"] = bar_pe;
 #endif
   return result;
 }
