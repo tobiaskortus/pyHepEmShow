@@ -97,9 +97,6 @@ nb::dict run_simulation(
   {
     nb::gil_scoped_release release;
 
-    static std::mutex tape_mutex;
-    std::lock_guard<std::mutex> tape_lock(tape_mutex);
-
     std::ifstream jsonIS(data_file.c_str());
     if (!jsonIS.is_open())
       throw std::runtime_error("run_simulation: cannot open data file: " + data_file);
