@@ -1,6 +1,13 @@
 cmake-build/
 .clangd
 
+build_backward/
+pyhepemshow/forward
+pyhepemshow/reverse
+pyhepemshow/forward_ad
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

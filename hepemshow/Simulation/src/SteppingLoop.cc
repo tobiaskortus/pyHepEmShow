@@ -20,6 +20,8 @@
 #include "Box.hh"
 #include "Results.hh"
 
+#include <cmath>
+
 
 
 
@@ -112,8 +114,13 @@ void SteppingLoop::GammaStepper(G4HepEmTLData& theTLData, G4HepEmState& theState
     if (theTLData.GetNumSecondaryElectronTrack() + theTLData.GetNumSecondaryGammaTrack() > 0 ) {
       StackSecondaries(theTLData, theTrackStack, *theTrack);
     }
+    // compute YZ cell indices and extract position for smearing
+    int indxCellY = 0, indxCellZ = 0;
+    G4double posY = GET_VALUE(globalPosition[1]), posZ = GET_VALUE(globalPosition[2]);
+    if (indxLayer >= 0)
+      theGeometry.ComputeCellIndices(posY, posZ, indxCellY, indxCellZ);
     // call the SteppingAction (whenever a step was done in the calorimeter)
-    SteppingAction(theResult, *theTrack, currentVolume, stepLength, indxLayer, indxAbs, eventID, numStep);
+    SteppingAction(theResult, *theTrack, currentVolume, stepLength, indxLayer, indxAbs, indxCellY, indxCellZ, posY, posZ, theGeometry, eventID, numStep);
 
     ++numStep;
   }
@@ -271,7 +278,13 @@ void SteppingLoop::ElectronStepper(G4HepEmTLData& theTLData, G4HepEmState& theSt
       StackSecondaries(theTLData, theTrackStack, *theTrack);
     }
 
-    SteppingAction(theResult, *theTrack, currentVolume, pStepLength, indxLayer, indxAbs, eventID, numStep);
+    // compute YZ cell indices and extract position for smearing
+    { int iy = 0, iz = 0;
+      G4double posY = GET_VALUE(globalPosition[1]), posZ = GET_VALUE(globalPosition[2]);
+      if (indxLayer >= 0)
+        theGeometry.ComputeCellIndices(posY, posZ, iy, iz);
+      SteppingAction(theResult, *theTrack, currentVolume, pStepLength, indxLayer, indxAbs, iy, iz, posY, posZ, theGeometry, eventID, numStep);
+    }
 
     ++numStep;
   }
@@ -307,12 +320,70 @@ void SteppingLoop::StackSecondaries(G4HepEmTLData& theTLData, TrackStack& theTra
 }
 
 
-void SteppingLoop::SteppingAction(Results& theResult, const G4HepEmTrack& theTrack, const Box* /*currentVolume*/, G4double /*currentPhysStepLength*/, int indxLayer, int /*indxAbsorber*/, int /*eventID*/, int /*stepID*/) {
+void SteppingLoop::SteppingAction(Results& theResult, const G4HepEmTrack& theTrack, const Box* /*currentVolume*/, G4double /*currentPhysStepLength*/, int indxLayer, int /*indxAbsorber*/, int indxCellY, int indxCellZ, G4double posY, G4double posZ, const Geometry& theGeometry, int /*eventID*/, int /*stepID*/) {
   if (indxLayer < 0) return;
   //
   const G4double edep = theTrack.GetEnergyDeposit();
-  if (edep > 0.0) {
-    theResult.fEdepPerLayer_CurrentEvent.Fill(indxLayer, edep);
+  if (edep <= 0.0) return;
+
+  const int gy = theGeometry.GetGranularityY();
+  const int gz = theGeometry.GetGranularityZ();
+
+  // Fast path: 1x1 granularity, direct fill
+  if (gy == 1 && gz == 1) {
+    theResult.fEdepPerCell_CurrentEvent[indxLayer][0][0] += edep;
+    return;
+  }
+
+  // Config parameters (not optimization variables): already plain double
+  const double sigma = theGeometry.GetGaussianSigma() > 0.0
+    ? theGeometry.GetGaussianSigma()
+    : 0.5 * theGeometry.GetCellSizeY();
+  const double invSigma2 = 1.0 / (sigma * sigma);
+  const double halfYZ = 0.5 * theGeometry.GetCaloSizeYZ();
+  const double cSizeY = theGeometry.GetCellSizeY();
+  const double cSizeZ = theGeometry.GetCellSizeZ();
+
+  // Center of the primary cell (config-derived, raw double)
+  const double cellCY = -halfYZ + (indxCellY + 0.5) * cSizeY;
+  const double cellCZ = -halfYZ + (indxCellZ + 0.5) * cSizeZ;
+
+  // Truncated at radius = 1 cell in each Y/Z direction (3x3 total)
+  const int R = 1;
+
+  // Weights use G4double so the tape captures the gradient through pY, pZ
+  G4double wTotal = 0.0;
+  G4double wContrib[(2*R+1)*(2*R+1)];
+  int contribIY[(2*R+1)*(2*R+1)];
+  int contribIZ[(2*R+1)*(2*R+1)];
+  int numContrib = 0;
+
+  for (int dy = -R; dy <= R; ++dy) {
+    const int ny = indxCellY + dy;
+    if (ny < 0 || ny >= gy) continue;
+    const G4double cellY = cellCY + dy * cSizeY;
+    for (int dz = -R; dz <= R; ++dz) {
+      const int nz = indxCellZ + dz;
+      if (nz < 0 || nz >= gz) continue;
+      const G4double cellZ = cellCZ + dz * cSizeZ;
+      const G4double dY = posY - cellY;
+      const G4double dZ = posZ - cellZ;
+      const G4double w = exp(-0.5 * (dY * dY + dZ * dZ) * invSigma2);
+      wContrib[numContrib] = w;
+      contribIY[numContrib] = ny;
+      contribIZ[numContrib] = nz;
+      wTotal += w;
+      ++numContrib;
+    }
+  }
+
+  if (GET_VALUE(wTotal) > 0.0) {
+    for (int ic = 0; ic < numContrib; ++ic) {
+      theResult.fEdepPerCell_CurrentEvent[indxLayer][contribIY[ic]][contribIZ[ic]]
+        += edep * (wContrib[ic] / wTotal);
+    }
+  } else {
+    theResult.fEdepPerCell_CurrentEvent[indxLayer][indxCellY][indxCellZ] += edep;
   }
 }
 

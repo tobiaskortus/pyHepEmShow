@@ -37,7 +37,6 @@
  * ```
  */
 
-#include "Hist.hh"
 #include <vector>
 #include "accumulator.hh"
 
@@ -46,19 +45,23 @@
  * Mean quantities are computed over the simulated events.
  */
 struct Results {
-  Hist fEdepPerLayer_CurrentEvent;  ///< per-layer energy deposit accumulator for the current event
-  std::vector<double> fEdepPerLayer; ///< per-event per-layer energy deposits, flat row-major [events*layers]
+  std::vector<std::vector<std::vector<G4double>>> fEdepPerCell_CurrentEvent; ///< per-cell energy deposit accumulator for the current event, sized [numLayers][gy][gz]
+  std::vector<double> fEdepPerCell; ///< per-event per-cell energy deposits, flat row-major [events * layers * gy * gz]
   std::vector<double> fParticleEnergy; ///< per-event primary particle kinetic energy [MeV]
   #ifdef CODI_FORWARD
-    std::vector<double> fEdepPerLayerD; ///< per-event per-layer dot values, flat row-major [events*layers]
+    std::vector<double> fEdepPerCellD; ///< per-event per-cell dot values, flat row-major [events * layers * gy * gz]
   #endif
   #ifdef CODI_REVERSE
-    std::vector<double> barEdep; ///< Adjoint seed values, flat row-major [events*layers].
+    std::vector<double> barEdep; ///< Adjoint seed values, flat row-major [events * layers * gy * gz].
     std::vector<Accumulator<double>> barThicknessAbsorber, barThicknessGap; ///< Per-layer accumulated bar values of the absorber/gap thicknesses.
     Accumulator<double> barParticleEnergy; ///< Accumulated bar value of the particle energy.
     std::vector<G4double> pThicknessAbsorber, pThicknessGap; ///< Per-layer copies of the thickness variables used as AD inputs.
     G4double pParticleEnergy; ///< Copy of the particle energy variable used as AD input.
   #endif
+
+  int GetNumCellsPerLayer() const { return fEdepPerCell_CurrentEvent.empty() ? 0 : (fEdepPerCell_CurrentEvent[0].empty() ? 0 : (int)fEdepPerCell_CurrentEvent[0][0].size()); }
+  int GetTotalCells(int numLayers) const { return numLayers * GetNumCellsPerLayer(); }
+  static int CellFlatIndex(int layer, int iy, int iz, int gy, int gz) { return (layer * gy + iy) * gz + iz; }
 };
 
 #endif // RESULTS_HH

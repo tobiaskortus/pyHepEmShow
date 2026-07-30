@@ -10,7 +10,13 @@
 Geometry::Geometry() {
   // default values: 50 layers of 2.3 [mm] absorber (PbWO4) and 5.7 [mm] gap (lAr)
   fNumLayers  =  50;
-  fCaloSizeYZ = 400; // defult value [mm]
+  fCaloSizeYZ = 400; // default value [mm]
+
+  // YZ granularity defaults (set explicitly so they are valid before UpdateParameters)
+  fCellSizeY    = fCaloSizeYZ;
+  fCellSizeZ    = fCaloSizeYZ;
+  fInvCellSizeY = 1.0 / fCaloSizeYZ;
+  fInvCellSizeZ = 1.0 / fCaloSizeYZ;
 
   // initialize per-layer thickness vectors with default values
   fAbsThick.assign(fNumLayers, 2.3);
@@ -64,7 +70,7 @@ void Geometry::UpdateParameters() {
   fPrimaryXPosition = -0.25*(worldThick + fCaloThick);
 
   // half size of all (but the world) along the YZ plane
-  const G4double halfCaloYZ = 0.5*fCaloSizeYZ;
+  const double halfCaloYZ = 0.5*fCaloSizeYZ;
 
   fBoxWorld->SetHalfLength(0.5*worldThick, 0);
   fBoxWorld->SetHalfLength(1.1*halfCaloYZ, 1);
@@ -92,6 +98,12 @@ void Geometry::UpdateParameters() {
     fBoxAbs->SetHalfLength(0.5*fAbsThick[0], 0);
     fBoxGap->SetHalfLength(0.5*fGapThick[0], 0);
   }
+
+  // update YZ cell sizes from granularity
+  fCellSizeY  = fCaloSizeYZ / fGranularityY;
+  fCellSizeZ  = fCaloSizeYZ / fGranularityZ;
+  fInvCellSizeY = 1.0 / fCellSizeY;
+  fInvCellSizeZ = 1.0 / fCellSizeZ;
 }
 
 
