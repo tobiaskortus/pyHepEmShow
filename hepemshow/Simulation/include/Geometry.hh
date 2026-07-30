@@ -210,7 +210,7 @@ public:
     *
     * @param[in]  val Required full transvers size of the `calorimeter` in [mm].
     */
-  void   SetCaloSizeYZ (G4double val) {
+  void   SetCaloSizeYZ (double val) {
     fCaloSizeYZ = val;
     UpdateParameters();
   }
@@ -218,7 +218,7 @@ public:
   /** Gives the transverse size of the  `calorimeter` (i.e. full size along the yz-axis).
     * @return full transverse size of the `calorimeter` volume/shape in [mm] units.
     */
-  G4double GetCaloSizeYZ ( ) const {
+  double GetCaloSizeYZ ( ) const {
     return fCaloSizeYZ;
   }
 
@@ -240,6 +240,38 @@ public:
     * @return the x-coordinate of the `calorimeter` boundary on the left hand side.
     */
   G4double GetCaloStartXposition() const { return fCaloStartX; }
+
+
+  /** Sets YZ granularity of the calorimeter readout.
+    * @param gy  Number of cells along Y axis (must be > 0).
+    * @param gz  Number of cells along Z axis (must be > 0).
+    */
+  void SetGranularity(int gy, int gz) {
+    if (gy > 0 && gz > 0) {
+      fGranularityY = gy;
+      fGranularityZ = gz;
+      UpdateParameters();
+    }
+  }
+
+  int  GetGranularityY() const { return fGranularityY; }
+  int  GetGranularityZ() const { return fGranularityZ; }
+
+  double GetCellSizeY() const { return fCellSizeY; }
+  double GetCellSizeZ() const { return fCellSizeZ; }
+
+  /** Maps global (y,z) coordinates to cell indices within [-caloSizeYZ/2, +caloSizeYZ/2]. */
+  void ComputeCellIndices(G4double y, G4double z, int& iy, int& iz) const {
+    const double halfYZ = 0.5 * fCaloSizeYZ;
+    iy = std::min(fGranularityY - 1, std::max(0,
+        static_cast<int>(GET_VALUE((y + halfYZ) * fInvCellSizeY))));
+    iz = std::min(fGranularityZ - 1, std::max(0,
+        static_cast<int>(GET_VALUE((z + halfYZ) * fInvCellSizeZ))));
+  }
+
+  /** Sets the Gaussian sigma for energy smearing. Negative => auto = cellSize/2. */
+  void SetGaussianSigma(double s) { fGaussianSigma = s; }
+  double GetGaussianSigma() const { return fGaussianSigma; }
 
 
   /**
@@ -353,8 +385,16 @@ private:
 
   /** The transverse size (i.e. full size along the `yz` axes) of the `calorimeter`
     * in [mm] units (same for `asborber`, `gap` and `layer` volumes/shapes)*/
-  G4double fCaloSizeYZ;
+  double fCaloSizeYZ;
 
+  // --- YZ granularity ---
+  int    fGranularityY = 1;
+  int    fGranularityZ = 1;
+  double fCellSizeY;
+  double fCellSizeZ;
+  double fInvCellSizeY;
+  double fInvCellSizeZ;
+  double fGaussianSigma = -1.0;
 
   /** The `x`-coordinate of the `calorimeter` boundary on the left hand size.
     * Calculated automatically (whenever the related parameters are updated) */

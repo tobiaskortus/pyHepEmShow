@@ -150,7 +150,10 @@ private:
    * @param eventID ID of the event to which the particle under tracking belongs to
    * @param stepID ID of this step that was just performed, i.e. number of steps cmpleted so far with with the current track
    */
-  static void SteppingAction(Results& theResult, const G4HepEmTrack& theTrack, const Box* currentVolume, G4double currentPhysStepLength, int indxLayer, int indxAbsorber, int eventID, int stepID);
+  static void SteppingAction(Results& theResult, const G4HepEmTrack& theTrack, const Box* currentVolume, 
+                             G4double currentPhysStepLength, int indxLayer, int indxAbsorber, 
+                             int indxCellY, int indxCellZ, G4double posY, G4double posZ, 
+                             const Geometry& theGeometry, int eventID, int stepID);
 
 
   // some utilities to modify 3vectors

@@ -189,34 +189,50 @@ void EventLoop::BeginOfEventAction(Results& theResult, int eventID, const G4HepE
     thePrimaryGenerator.SetKinEnergy(theResult.pParticleEnergy);
   #endif
 
-  const int numLayers = theResult.fEdepPerLayer_CurrentEvent.GetNumBins();
-  for (int i = 0; i < numLayers; ++i) {
-    theResult.fEdepPerLayer_CurrentEvent.GetY()[i] = 0.;
-  }
-
+  const int numLayers = theGeometry.GetNumLayers();
+  const int gy = theGeometry.GetGranularityY();
+  const int gz = theGeometry.GetGranularityZ();
+  theResult.fEdepPerCell_CurrentEvent.assign(numLayers,
+    std::vector<std::vector<G4double>>(gy, std::vector<G4double>(gz, 0.0)));
 }
 
 void EventLoop::EndOfEventAction(Results& theResult, int eventID) {
-  const int numLayers = theResult.fEdepPerLayer_CurrentEvent.GetNumBins();
-  for(int i=0; i<numLayers; i++){
-    const double val = GET_VALUE(theResult.fEdepPerLayer_CurrentEvent.GetY()[i]);
-    theResult.fEdepPerLayer.push_back(val);
-    #if CODI_FORWARD
-    {
-      const double dotval = GET_DOTVALUE(theResult.fEdepPerLayer_CurrentEvent.GetY()[i]);
-      theResult.fEdepPerLayerD.push_back(dotval);
+  const int numLayers = (int)theResult.fEdepPerCell_CurrentEvent.size();
+  const int gy = numLayers > 0 ? (int)theResult.fEdepPerCell_CurrentEvent[0].size() : 1;
+  const int gz = gy > 0 ? (int)theResult.fEdepPerCell_CurrentEvent[0][0].size() : 1;
+  for (int i = 0; i < numLayers; ++i) {
+    for (int iy = 0; iy < gy; ++iy) {
+      for (int iz = 0; iz < gz; ++iz) {
+        const double val = GET_VALUE(theResult.fEdepPerCell_CurrentEvent[i][iy][iz]);
+        theResult.fEdepPerCell.push_back(val);
+        #if CODI_FORWARD
+        {
+          const double dotval = GET_DOTVALUE(theResult.fEdepPerCell_CurrentEvent[i][iy][iz]);
+          theResult.fEdepPerCellD.push_back(dotval);
+        }
+        #endif
+      }
     }
-    #endif
   }
 
   #ifdef CODI_REVERSE
-     for (int i = 0; i < numLayers; ++i) {
-       G4double::getTape().registerOutput(theResult.fEdepPerLayer_CurrentEvent.GetY()[i]);
+    for (int i = 0; i < numLayers; ++i) {
+      for (int iy = 0; iy < gy; ++iy) {
+        for (int iz = 0; iz < gz; ++iz) {
+          G4double::getTape().registerOutput(theResult.fEdepPerCell_CurrentEvent[i][iy][iz]);
+        }
+      }
     }
     G4double::getTape().setPassive();
-     for (int i = 0; i < numLayers; ++i) {
-       std::size_t seedIdx = static_cast<std::size_t>(eventID) * static_cast<std::size_t>(numLayers) + static_cast<std::size_t>(i);
-       theResult.fEdepPerLayer_CurrentEvent.GetY()[i].setGradient(theResult.barEdep[seedIdx]);
+    const int totalCells = numLayers * gy * gz;
+    for (int i = 0; i < numLayers; ++i) {
+      for (int iy = 0; iy < gy; ++iy) {
+        for (int iz = 0; iz < gz; ++iz) {
+          int flatIdx = Results::CellFlatIndex(i, iy, iz, gy, gz);
+          std::size_t seedIdx = static_cast<std::size_t>(eventID) * static_cast<std::size_t>(totalCells) + static_cast<std::size_t>(flatIdx);
+          theResult.fEdepPerCell_CurrentEvent[i][iy][iz].setGradient(theResult.barEdep[seedIdx]);
+        }
+      }
     }
     theResult.barThicknessAbsorber.resize(theResult.pThicknessAbsorber.size());
     theResult.barThicknessGap.resize(theResult.pThicknessGap.size());
