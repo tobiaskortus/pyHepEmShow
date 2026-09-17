@@ -1,12 +1,35 @@
+# CMake / Clang
 cmake-build/
 .clangd
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+Makefile.in
+Makefile.cmake
 
-build_backward/
-pyhepemshow/forward
-pyhepemshow/reverse
-pyhepemshow/forward_ad
+# Build directories (forward/forward_ad/backward variants)
+build/
+build_*
+install_*
 
+# Generated architecture-specific binaries checked into the Python package
+# dirs (the package __init__.py and data files are kept tracked).
+pyhepemshow/*/__pycache__/
+pyhepemshow/*/*.so
+pyhepemshow/*/lib*.dylib
 
+# Autodiff / compiled artifacts
+*.so
+*.dylib
+*.dll
+*.o
+*.a
+*.out
+
+# Python build artifacts
+*.egg-info/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -15,6 +38,8 @@ __pycache__/
 
 # C extensions
 *.so
+*.dylib
+*.dll
 
 # Distribution / packaging
 .Python
