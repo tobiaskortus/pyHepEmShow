@@ -4,3 +4,4 @@
 [submodule "CoDiPack"]
 	path = externals/CoDiPack
 	url = https://github.com/tobiaskortus/CoDiPack.git
+	branch = feature/thread-local-tape
