@@ -1,7 +1,6 @@
 #include "ad_type.h"
 
 #include "EventLoop.hh"
-#include "URandom.hh"
 
 #include "G4HepEmTLData.hh"
 #include "G4HepEmState.hh"
@@ -20,7 +19,8 @@
 
 
 void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity,
-                              double particle_energy_min, double particle_energy_max, URandom* theURnd) {
+                              const std::vector<double>& particle_energies,
+                              const std::vector<double>& particle_energies_dot) {
   //
   // first create the container for the tracks, i.e. the track-stack:
   // - before and at the end of a given event processing: empty
@@ -65,20 +65,16 @@ void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, 
     //   track reference from the stack and generate one primary into that
     G4HepEmTrack& primaryTrack = theTrackStack.Insert();
 
-    // 2. Invoke the beginning of event action (by passing the current primary track)
-    BeginOfEventAction(theResult, eventID, primaryTrack, theGeometry, thePrimaryGenerator);
-
-    // Continuation of 1.:
-    double sampledEnergy;
-    if (particle_energy_max > particle_energy_min) {
-      sampledEnergy = particle_energy_min
-                      + (particle_energy_max - particle_energy_min) * GET_VALUE(theURnd->flat());
-    } else {
-      sampledEnergy = particle_energy_min;
-    }
-    G4double energyG4 = sampledEnergy;
+    G4double energyG4 = particle_energies[eventID];
+    #ifdef CODI_FORWARD
+      if (!particle_energies_dot.empty())
+        SET_DOTVALUE(energyG4, particle_energies_dot[eventID]);
+    #endif
     thePrimaryGenerator.SetKinEnergy(energyG4);
-    theResult.fParticleEnergy.push_back(sampledEnergy);
+    theResult.fParticleEnergy.push_back(particle_energies[eventID]);
+
+    // Register the per-event energy as the active AD input before generating.
+    BeginOfEventAction(theResult, eventID, primaryTrack, theGeometry, thePrimaryGenerator);
 
     thePrimaryGenerator.GenerateOne(primaryTrack);
     primaryTrack.SetID(theTrackStack.GetNextTrackID());
@@ -238,10 +234,10 @@ void EventLoop::EndOfEventAction(Results& theResult, int eventID) {
     theResult.barThicknessGap.resize(theResult.pThicknessGap.size());
     G4double::getTape().evaluate();
     for (int i = 0; i < (int)theResult.pThicknessAbsorber.size(); ++i) {
-      theResult.barThicknessAbsorber[i].add(theResult.pThicknessAbsorber[i].getGradient());
-      theResult.barThicknessGap[i].add(theResult.pThicknessGap[i].getGradient());
+      theResult.barThicknessAbsorber[i] += theResult.pThicknessAbsorber[i].getGradient();
+      theResult.barThicknessGap[i] += theResult.pThicknessGap[i].getGradient();
     }
-    theResult.barParticleEnergy.add( theResult.pParticleEnergy.getGradient() );
+    theResult.barParticleEnergies.push_back(theResult.pParticleEnergy.getGradient());
   #endif
 }
 

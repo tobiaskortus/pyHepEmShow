@@ -3,6 +3,8 @@
 #ifndef EVENTLOOP_HH
 #define EVENTLOOP_HH
 
+#include <vector>
+
 /**
  * @file    EventLoop.hh
  * @class   EventLoop
@@ -24,7 +26,6 @@ class G4HepEmTrack;
 class PrimaryGenerator;
 class Geometry;
 class Results;
-class URandom;
 
 class EventLoop {
 
@@ -49,10 +50,12 @@ public:
    * @param theResult the data structure that holds all the infomation needs to be collected during the simulation.
    * @param numEventToSimulate number of events required to be simulated
    * @param verbosity to control the verbosity of printouts reporting progress and state of the event processing
+   * @param particle_energies per-event primary energies
+   * @param particle_energies_dot per-event forward-mode energy tangents
    */
   static void ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity,
-                            double particle_energy_min, double particle_energy_max,
-                            URandom* theURnd);
+                            const std::vector<double>& particle_energies,
+                            const std::vector<double>& particle_energies_dot);
 
 private:
   EventLoop() = delete;

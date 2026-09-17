@@ -38,7 +38,6 @@
  */
 
 #include <vector>
-#include "accumulator.hh"
 
 /**
  * Data that are collected during the entire `run` of the simulation.
@@ -53,8 +52,8 @@ struct Results {
   #endif
   #ifdef CODI_REVERSE
     std::vector<double> barEdep; ///< Adjoint seed values, flat row-major [events * layers * gy * gz].
-    std::vector<Accumulator<double>> barThicknessAbsorber, barThicknessGap; ///< Per-layer accumulated bar values of the absorber/gap thicknesses.
-    Accumulator<double> barParticleEnergy; ///< Accumulated bar value of the particle energy.
+    std::vector<double> barThicknessAbsorber, barThicknessGap; ///< Per-layer accumulated absorber/gap thickness adjoints.
+    std::vector<double> barParticleEnergies; ///< Per-event primary energy adjoints.
     std::vector<G4double> pThicknessAbsorber, pThicknessGap; ///< Per-layer copies of the thickness variables used as AD inputs.
     G4double pParticleEnergy; ///< Copy of the particle energy variable used as AD input.
   #endif

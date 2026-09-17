@@ -30,6 +30,8 @@
 
 namespace nb = nanobind;
 
+using ConstNdArray4D = nb::ndarray<nb::numpy, const double, nb::ndim<4>, nb::c_contig>;
+
 #ifndef PYHEPEMSHOW_MODULE_NAME
 #define PYHEPEMSHOW_MODULE_NAME _core
 #endif
@@ -41,18 +43,17 @@ nb::dict run_simulation(
     const std::vector<double>& gap_thickness          = {},
     double                     transverse_size        = 400.0,
     const std::string&         particle               = "e-",
-    double                     particle_energy_min    = 10000.0,
-    double                     particle_energy_max    = 10000.0,
-    int                        num_events             = 1000,
+    const std::vector<double>& particle_energies      = {},
     double                     random_seed            = 1234.0,
     int                        verbosity              = 1,
     int                        gy          = 1,
     int                        gz          = 1,
     double                     gaussian_sigma         = -1.0,
-    const std::vector<double>& bar_edep               = {},
-    // CODI_FORWARD tangent seeds (per-layer or empty for zero; ignored in non-AD builds)
+    ConstNdArray4D             bar_edep               = {},
+    // CODI_FORWARD tangent seeds (ignored in non-AD builds)
     const std::vector<double>& absorber_thickness_dot = {},
-    const std::vector<double>& gap_thickness_dot      = {})
+    const std::vector<double>& gap_thickness_dot      = {},
+    const std::vector<double>& particle_energies_dot  = {})
 {
   // Derive number of layers from the thickness vectors
   if (absorber_thickness.size() != gap_thickness.size())
@@ -62,6 +63,7 @@ nb::dict run_simulation(
               + std::to_string(gap_thickness.size()) + ")");
               
   const int num_layers = (int)absorber_thickness.size();
+  const int num_events = (int)particle_energies.size();
 
   if (!absorber_thickness_dot.empty() && (int)absorber_thickness_dot.size() != num_layers)
     throw std::runtime_error(
@@ -73,18 +75,33 @@ nb::dict run_simulation(
       "run_simulation: gap_thickness_dot must be empty or match the number of layers "
       "(" + std::to_string(num_layers) + "), got " + std::to_string(gap_thickness_dot.size()));
 
+  if (!particle_energies_dot.empty() && (int)particle_energies_dot.size() != num_events)
+    throw std::runtime_error(
+      "run_simulation: particle_energies_dot must be empty or match num_events (" +
+      std::to_string(num_events) + "), got " +
+      std::to_string(particle_energies_dot.size()));
+
   const std::size_t total_cells_per_layer = static_cast<std::size_t>(gy) * static_cast<std::size_t>(gz);
   const std::size_t total_cells_per_event = static_cast<std::size_t>(num_layers) * total_cells_per_layer;
 
 #ifdef CODI_REVERSE
-  const std::size_t num_layers_sz = static_cast<std::size_t>(num_layers);
   const std::size_t num_events_sz = static_cast<std::size_t>(num_events);
   const std::size_t event_cell_size = num_events_sz * total_cells_per_event;
-  if (!bar_edep.empty() && bar_edep.size() != total_cells_per_event && bar_edep.size() != event_cell_size) {
-    throw std::runtime_error(
-      "run_simulation: bar_edep must be empty, per-event (" + std::to_string(total_cells_per_event) +
-      "), or per-event-per-cell (" + std::to_string(event_cell_size) + "), got " +
-      std::to_string(bar_edep.size()));
+  std::vector<double> bar_edep_local;
+  
+  if (bar_edep.is_valid()) {
+    if (bar_edep.shape(0) != static_cast<size_t>(num_events) ||
+        bar_edep.shape(1) != static_cast<size_t>(num_layers) ||
+        bar_edep.shape(2) != static_cast<size_t>(gy) ||
+        bar_edep.shape(3) != static_cast<size_t>(gz)) {
+      throw std::runtime_error(
+        "run_simulation: bar_edep must have shape (" +
+        std::to_string(num_events) + ", " +
+        std::to_string(num_layers) + ", " +
+        std::to_string(gy) + ", " +
+        std::to_string(gz) + ")");
+    }
+    bar_edep_local.assign(bar_edep.data(), bar_edep.data() + bar_edep.size());
   }
 #endif
   std::vector<double> res_edep_per_cell;
@@ -93,11 +110,9 @@ nb::dict run_simulation(
   std::vector<double> res_edep_per_cell_dot;
 #endif
 #ifdef CODI_REVERSE
-  const std::vector<double> bar_edep_local = bar_edep;
   std::vector<double> res_bar_thickness_absorber;
   std::vector<double> res_bar_thickness_gap;
-  double              res_bar_particle_energy_mean = 0.0;
-  double              res_bar_particle_energy_var  = 0.0;
+  std::vector<double> res_bar_particle_energies;
 #endif
 
   {
@@ -135,7 +150,6 @@ nb::dict run_simulation(
     thePrimaryGenerator.SetCharge((particle == "e-") ? -1.0 : (particle == "gamma" ? 0.0 : +1.0));
     thePrimaryGenerator.SetPosition(theGeometry.GetPrimaryXposition(), 0.0, 0.0);
     thePrimaryGenerator.SetDirection(1.0, 0.0, 0.0);
-    thePrimaryGenerator.SetKinEnergy(particle_energy_min);
 
     Results theResult;
     theResult.fEdepPerCell_CurrentEvent.assign(num_layers,
@@ -148,14 +162,14 @@ nb::dict run_simulation(
 #endif
 #ifdef CODI_REVERSE
     theResult.barEdep = bar_edep_local.empty()
-      ? std::vector<double>(static_cast<std::size_t>(num_events) * static_cast<std::size_t>(total_cells_per_event), 0.0)
+      ? std::vector<double>(event_cell_size, 0.0)
       : bar_edep_local;
     theResult.barThicknessAbsorber.resize(num_layers);
     theResult.barThicknessGap.resize(num_layers);
 #endif
     EventLoop::ProcessEvents(*theTLData, *theState, thePrimaryGenerator, theGeometry,
                              theResult, num_events, verbosity,
-                             particle_energy_min, particle_energy_max, theURnd);
+                             particle_energies, particle_energies_dot);
 
     delete theRandomEngine;
     delete theURnd;
@@ -170,14 +184,9 @@ nb::dict run_simulation(
     res_edep_per_cell_dot = std::move(theResult.fEdepPerCellD);
 #endif
 #ifdef CODI_REVERSE
-    res_bar_thickness_absorber.resize(num_layers);
-    res_bar_thickness_gap.resize(num_layers);
-    for (int i = 0; i < num_layers; ++i) {
-      res_bar_thickness_absorber[i] = theResult.barThicknessAbsorber[i].getMean();
-      res_bar_thickness_gap[i]      = theResult.barThicknessGap[i].getMean();
-    }
-    res_bar_particle_energy_mean = theResult.barParticleEnergy.getMean();
-    res_bar_particle_energy_var  = theResult.barParticleEnergy.getVar();
+    res_bar_thickness_absorber = std::move(theResult.barThicknessAbsorber);
+    res_bar_thickness_gap      = std::move(theResult.barThicknessGap);
+    res_bar_particle_energies  = std::move(theResult.barParticleEnergies);
 #endif
   } // GIL re-acquired here
 
@@ -190,12 +199,12 @@ nb::dict run_simulation(
     return nb::ndarray<nb::numpy, double, nb::ndim<4>>(heap->data(), 4, shape, owner);
   };
 
-  auto to_numpy1d = [num_events](std::vector<double> v) {
+  auto to_numpy1d = [](std::vector<double> v) {
     auto* heap = new std::vector<double>(std::move(v));
     nb::capsule owner(heap, [](void* p) noexcept {
       delete static_cast<std::vector<double>*>(p);
     });
-    size_t shape[1] = {(size_t)num_events};
+    size_t shape[1] = {heap->size()};
     return nb::ndarray<nb::numpy, double, nb::ndim<1>>(heap->data(), 1, shape, owner);
   };
 
@@ -206,18 +215,9 @@ nb::dict run_simulation(
   result["edep_per_cell_dot"] = to_numpy4d(std::move(res_edep_per_cell_dot));
 #endif
 #ifdef CODI_REVERSE
-  auto to_numpy1d_vec = [num_layers](std::vector<double> v) {
-    auto* heap = new std::vector<double>(std::move(v));
-    nb::capsule owner(heap, [](void* p) noexcept { delete static_cast<std::vector<double>*>(p); });
-    size_t shape[1] = {(size_t)num_layers};
-    return nb::ndarray<nb::numpy, double, nb::ndim<1>>(heap->data(), 1, shape, owner);
-  };
-  result["bar_thickness_absorber"] = to_numpy1d_vec(std::move(res_bar_thickness_absorber));
-  result["bar_thickness_gap"]      = to_numpy1d_vec(std::move(res_bar_thickness_gap));
-  nb::dict bar_pe;
-  bar_pe["mean"] = res_bar_particle_energy_mean;
-  bar_pe["var"]  = res_bar_particle_energy_var;
-  result["bar_particle_energy"] = bar_pe;
+  result["bar_thickness_absorber"] = to_numpy1d(std::move(res_bar_thickness_absorber));
+  result["bar_thickness_gap"]      = to_numpy1d(std::move(res_bar_thickness_gap));
+  result["bar_particle_energies"]  = to_numpy1d(std::move(res_bar_particle_energies));
 #endif
   return result;
 }
@@ -231,17 +231,16 @@ NB_MODULE(PYHEPEMSHOW_MODULE_NAME, m) {
       nb::arg("gap_thickness")      = std::vector<double>(50, 5.7),
       nb::arg("transverse_size")    = 400.0,
       nb::arg("particle")           = "e-",
-      nb::arg("particle_energy_min") = 10000.0,
-      nb::arg("particle_energy_max") = 10000.0,
-      nb::arg("num_events")         = 1000,
+      nb::arg("particle_energies"),
       nb::arg("random_seed")        = 1234.0,
       nb::arg("verbosity")          = 1,
       nb::arg("gy")      = 1,
       nb::arg("gz")      = 1,
       nb::arg("gaussian_sigma")     = -1.0,
-      nb::arg("bar_edep")           = std::vector<double>{},
+      nb::arg("bar_edep")           = nb::none(),
       nb::arg("absorber_thickness_dot") = std::vector<double>{},
-      nb::arg("gap_thickness_dot")      = std::vector<double>{});
+      nb::arg("gap_thickness_dot")      = std::vector<double>{},
+      nb::arg("particle_energies_dot")  = std::vector<double>{});
   };
 
   m.attr("compiled_mode") = PYHEPEMSHOW_MODE_NAME;
