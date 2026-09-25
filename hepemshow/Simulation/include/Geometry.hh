@@ -202,6 +202,30 @@ public:
     return fGapThick;
   }
 
+  /** Seeds the per-layer absorber thickness dot values for a single event.
+    *
+    * Only the dot values are changed: the primal thicknesses are left
+    * untouched. All derived geometry quantities (layer thicknesses, cumulative
+    * starts, calorimeter size and positions) are recomputed so their dot values
+    * reflect the new per-event seeds.
+    *
+    * In non-forward-mode builds this is a no-op.
+    *
+    * @param[in] dots Per-layer absorber thickness dot values; must have `fNumLayers` elements.
+    */
+  void   SetAbsThickTangentPerLayer (const std::vector<double>& dots);
+
+  /** Seeds the per-layer gap thickness dot values for a single event.
+    *
+     * See `SetAbsThickTangentPerLayer()`: primal values remain unchanged and all derived
+     * geometry quantities are recomputed for the new per-event dot values.
+    *
+    * In non-forward-mode builds this is a no-op.
+    *
+    * @param[in] dots Per-layer gap thickness dot values; must have `fNumLayers` elements.
+    */
+  void   SetGapThickTangentPerLayer (const std::vector<double>& dots);
+
 
   /** Sets the transverse size (i.e. full size along the yz-axes).
     *

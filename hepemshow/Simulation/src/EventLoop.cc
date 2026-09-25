@@ -20,7 +20,9 @@
 
 void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity,
                               const std::vector<double>& particle_energies,
-                              const std::vector<double>& particle_energies_dot) {
+                              const std::vector<double>& particle_energies_dot,
+                              const std::vector<std::vector<double>>& absorber_thickness_dots,
+                              const std::vector<std::vector<double>>& gap_thickness_dots) {
   //
   // first create the container for the tracks, i.e. the track-stack:
   // - before and at the end of a given event processing: empty
@@ -73,8 +75,9 @@ void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, 
     thePrimaryGenerator.SetKinEnergy(energyG4);
     theResult.fParticleEnergy.push_back(particle_energies[eventID]);
 
-    // Register the per-event energy as the active AD input before generating.
-    BeginOfEventAction(theResult, eventID, primaryTrack, theGeometry, thePrimaryGenerator);
+    // Register the per-event energy and geometry dot values as the active AD inputs before generating.
+    BeginOfEventAction(theResult, eventID, primaryTrack, theGeometry, thePrimaryGenerator,
+                       absorber_thickness_dots, gap_thickness_dots);
 
     thePrimaryGenerator.GenerateOne(primaryTrack);
     primaryTrack.SetID(theTrackStack.GetNextTrackID());
@@ -161,8 +164,19 @@ void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, 
 }
 
 
-void EventLoop::BeginOfEventAction(Results& theResult, int eventID, const G4HepEmTrack& thePrimaryTrack, Geometry& theGeometry, PrimaryGenerator& thePrimaryGenerator) {
+void EventLoop::BeginOfEventAction(Results& theResult, int eventID, const G4HepEmTrack& thePrimaryTrack, Geometry& theGeometry, PrimaryGenerator& thePrimaryGenerator,
+                                   const std::vector<std::vector<double>>& absorber_thickness_dots,
+                                   const std::vector<std::vector<double>>& gap_thickness_dots) {
   // reset all per-event accumulators in results, i.e. that are used to accumulate data during one event
+
+  #if CODI_FORWARD
+    const std::size_t eventRow = static_cast<std::size_t>(eventID);
+    const std::size_t eventNumLayers = static_cast<std::size_t>(theGeometry.GetNumLayers());
+    if (eventRow < absorber_thickness_dots.size() && absorber_thickness_dots[eventRow].size() == eventNumLayers)
+      theGeometry.SetAbsThickTangentPerLayer(absorber_thickness_dots[eventRow]);
+    if (eventRow < gap_thickness_dots.size() && gap_thickness_dots[eventRow].size() == eventNumLayers)
+      theGeometry.SetGapThickTangentPerLayer(gap_thickness_dots[eventRow]);
+  #endif
 
   #ifdef CODI_REVERSE
     G4double::getTape().reset();

@@ -50,10 +50,11 @@ nb::dict run_simulation(
     int                        gz          = 1,
     double                     gaussian_sigma         = -1.0,
     ConstNdArray4D             bar_edep               = {},
-    // CODI_FORWARD tangent seeds (ignored in non-AD builds)
     const std::vector<double>& absorber_thickness_dot = {},
     const std::vector<double>& gap_thickness_dot      = {},
-    const std::vector<double>& particle_energies_dot  = {})
+    const std::vector<double>& particle_energies_dot  = {},
+    const std::vector<std::vector<double>>& absorber_thickness_dots = {},
+    const std::vector<std::vector<double>>& gap_thickness_dots      = {})
 {
   // Derive number of layers from the thickness vectors
   if (absorber_thickness.size() != gap_thickness.size())
@@ -80,6 +81,25 @@ nb::dict run_simulation(
       "run_simulation: particle_energies_dot must be empty or match num_events (" +
       std::to_string(num_events) + "), got " +
       std::to_string(particle_energies_dot.size()));
+
+  auto validate_per_event_layer_dots = [&](const std::vector<std::vector<double>>& dots, const char* name) {
+    if (dots.empty())
+      return;
+    if ((int)dots.size() != num_events)
+      throw std::runtime_error(
+        std::string("run_simulation: ") + name + " must be empty or have num_events (" +
+        std::to_string(num_events) + ") rows, got " + std::to_string(dots.size()));
+    for (std::size_t i = 0; i < dots.size(); ++i) {
+      if ((int)dots[i].size() != num_layers)
+        throw std::runtime_error(
+          std::string("run_simulation: ") + name + " row " + std::to_string(i) +
+          " must have num_layers (" + std::to_string(num_layers) + ") columns, got " +
+          std::to_string(dots[i].size()));
+    }
+  };
+
+  validate_per_event_layer_dots(absorber_thickness_dots, "absorber_thickness_dots");
+  validate_per_event_layer_dots(gap_thickness_dots, "gap_thickness_dots");
 
   const std::size_t total_cells_per_layer = static_cast<std::size_t>(gy) * static_cast<std::size_t>(gz);
   const std::size_t total_cells_per_event = static_cast<std::size_t>(num_layers) * total_cells_per_layer;
@@ -169,7 +189,8 @@ nb::dict run_simulation(
 #endif
     EventLoop::ProcessEvents(*theTLData, *theState, thePrimaryGenerator, theGeometry,
                              theResult, num_events, verbosity,
-                             particle_energies, particle_energies_dot);
+                             particle_energies, particle_energies_dot,
+                             absorber_thickness_dots, gap_thickness_dots);
 
     delete theRandomEngine;
     delete theURnd;
@@ -240,7 +261,9 @@ NB_MODULE(PYHEPEMSHOW_MODULE_NAME, m) {
       nb::arg("bar_edep")           = nb::none(),
       nb::arg("absorber_thickness_dot") = std::vector<double>{},
       nb::arg("gap_thickness_dot")      = std::vector<double>{},
-      nb::arg("particle_energies_dot")  = std::vector<double>{});
+      nb::arg("particle_energies_dot")  = std::vector<double>{},
+      nb::arg("absorber_thickness_dots") = std::vector<std::vector<double>>{},
+      nb::arg("gap_thickness_dots")      = std::vector<std::vector<double>>{});
   };
 
   m.attr("compiled_mode") = PYHEPEMSHOW_MODE_NAME;

@@ -51,17 +51,30 @@ public:
    * @param numEventToSimulate number of events required to be simulated
    * @param verbosity to control the verbosity of printouts reporting progress and state of the event processing
    * @param particle_energies per-event primary energies
-   * @param particle_energies_dot per-event forward-mode energy tangents
+   * @param particle_energies_dot per-event forward-mode energy dot values
+   * @param absorber_thickness_dots per-event, per-layer forward-mode absorber thickness dot values
+   *        (`num_events` rows of `num_layers` values; empty to keep the geometry dot values fixed)
+   * @param gap_thickness_dots per-event, per-layer forward-mode gap thickness dot values
+   *        (`num_events` rows of `num_layers` values; empty to keep the geometry dot values fixed)
    */
   static void ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity,
                             const std::vector<double>& particle_energies,
-                            const std::vector<double>& particle_energies_dot);
+                            const std::vector<double>& particle_energies_dot,
+                            const std::vector<std::vector<double>>& absorber_thickness_dots = {},
+                            const std::vector<std::vector<double>>& gap_thickness_dots = {});
 
 private:
   EventLoop() = delete;
 
-  /** Method invoked at the beginning of each event by passing the (single) primary track of the event.*/
-  static void BeginOfEventAction(Results& theResult, int eventID, const G4HepEmTrack& thePrimaryTrack, Geometry& theGeometry, PrimaryGenerator& thePrimaryGenerator);
+  /** Method invoked at the beginning of each event by passing the (single) primary track of the event.
+    *
+     * Before the event is generated, this also installs the event's per-layer geometry dot values
+    * (`absorber_thickness_dots`/`gap_thickness_dots` rows for `eventID`) so that the geometry
+    * carries per-event forward-mode seeds. Empty vectors are a no-op.
+    */
+  static void BeginOfEventAction(Results& theResult, int eventID, const G4HepEmTrack& thePrimaryTrack, Geometry& theGeometry, PrimaryGenerator& thePrimaryGenerator,
+                                 const std::vector<std::vector<double>>& absorber_thickness_dots,
+                                 const std::vector<std::vector<double>>& gap_thickness_dots);
   /** Method invoked at the end of each event.*/
   static void EndOfEventAction(  Results& theResult, int eventID);
 

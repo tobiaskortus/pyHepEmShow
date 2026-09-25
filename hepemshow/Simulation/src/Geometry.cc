@@ -6,6 +6,8 @@
 #include "Box.hh"
 
 #include <iostream>
+#include <stdexcept>
+#include <string>
 
 Geometry::Geometry() {
   // default values: 50 layers of 2.3 [mm] absorber (PbWO4) and 5.7 [mm] gap (lAr)
@@ -104,6 +106,36 @@ void Geometry::UpdateParameters() {
   fCellSizeZ  = fCaloSizeYZ / fGranularityZ;
   fInvCellSizeY = 1.0 / fCellSizeY;
   fInvCellSizeZ = 1.0 / fCellSizeZ;
+}
+
+
+void Geometry::SetAbsThickTangentPerLayer(const std::vector<double>& dots) {
+#if CODI_FORWARD
+  if (dots.size() != fAbsThick.size())
+    throw std::runtime_error(
+      "Geometry::SetAbsThickTangentPerLayer: expected " + std::to_string(fAbsThick.size()) +
+      " per-layer tangents, got " + std::to_string(dots.size()));
+  for (std::size_t i = 0; i < dots.size(); ++i)
+    SET_DOTVALUE(fAbsThick[i], dots[i]);
+  UpdateParameters();
+#else
+  (void)dots;
+#endif
+}
+
+
+void Geometry::SetGapThickTangentPerLayer(const std::vector<double>& dots) {
+#if CODI_FORWARD
+  if (dots.size() != fGapThick.size())
+    throw std::runtime_error(
+      "Geometry::SetGapThickTangentPerLayer: expected " + std::to_string(fGapThick.size()) +
+      " per-layer tangents, got " + std::to_string(dots.size()));
+  for (std::size_t i = 0; i < dots.size(); ++i)
+    SET_DOTVALUE(fGapThick[i], dots[i]);
+  UpdateParameters();
+#else
+  (void)dots;
+#endif
 }
 
 
