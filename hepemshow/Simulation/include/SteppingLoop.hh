@@ -152,8 +152,15 @@ private:
    */
   static void SteppingAction(Results& theResult, const G4HepEmTrack& theTrack, const Box* currentVolume, 
                              G4double currentPhysStepLength, int indxLayer, int indxAbsorber, 
-                             int indxCellY, int indxCellZ, G4double posY, G4double posZ, 
+                             const G4double* position,
                              const Geometry& theGeometry, int eventID, int stepID);
+
+  static void GaussianYZAction(Results& theResult, G4double edep, int indxLayer,
+                               int indxCellY, int indxCellZ, G4double posY, G4double posZ,
+                               const Geometry& theGeometry);
+
+  static void TrilinearYZAction(Results& theResult, G4double edep, int indxLayer,
+                                G4double posY, G4double posZ, const Geometry& theGeometry);
 
 
   // some utilities to modify 3vectors

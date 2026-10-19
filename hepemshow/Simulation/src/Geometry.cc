@@ -159,10 +159,27 @@ G4double Geometry::CalculateDistanceToOut(G4double* r, G4double *v, Box** curren
 
   // calculate the position in the `layer` system:
   // - find the layer index by scanning cumulative layer start positions
+  // - a boundary-limited step can end exactly on an internal boundary, but
+  //   floating-point rounding may place the post-step point just before or
+  //   just after that boundary. A plain `<` comparison then assigns the
+  //   point to the old or the new layer based on that rounding. If it
+  //   chooses the old layer, the point lies just outside that layer, so the
+  //   stepper takes a push step. That extra step consumes random numbers and
+  //   skips the normal physics step, which changes the subsequent shower. To
+  //   make the choice independent of rounding, points within `kNavTol` of a
+  //   boundary are assigned to the volume the track is entering: the later
+  //   layer when moving forward, and the earlier layer when moving backward
+  //   or parallel.
+  //   This rule is needed for finite-difference comparisons, not because AD
+  //   is wrong: forward and reverse AD already agree without it. Finite
+  //   differences follow a perturbed trajectory, so without this rule they
+  //   can select a different boundary branch and resample the random stream.
+  constexpr double kNavTol = 1.0E-9;
   const G4double rxRel = rx_Calo + 0.5*fCaloThick; // position relative to calo left edge
   int iLayer = fNumLayers - 1;
   for (int i = 0; i < fNumLayers - 1; ++i) {
-    if (GET_VALUE(rxRel) < GET_VALUE(fLayerStartX[i+1])) {
+    if (GET_VALUE(rxRel) < GET_VALUE(fLayerStartX[i+1]) - kNavTol ||
+        (GET_VALUE(rxRel) <= GET_VALUE(fLayerStartX[i+1]) + kNavTol && GET_VALUE(v[0]) < kNavTol)) {
       iLayer = i;
       break;
     }
@@ -188,8 +205,22 @@ G4double Geometry::CalculateDistanceToOut(G4double* r, G4double *v, Box** curren
     // NOTE: I could also push here and do recursion but keep it clear and push only in the steppers
   }
 
-  // calculate if the point is in the `absorber` or the `gap` part of the `layer`
-  if (rx_Layer + 0.5*layThick < absThick || gapThick == 0) { // in the `absorber`
+  // calculate if the point is in the `absorber` or the `gap` part of the `layer`:
+  // - same determinism rule as for the layer scan: on the interface, the
+  //   point is assigned to the volume the track is entering
+  bool inAbsorber;
+  if (gapThick == 0) {
+    inAbsorber = true;
+  } else {
+    const G4double interfaceX = -0.5*layThick + absThick; // interface in layer coords
+    if (GET_VALUE(rx_Layer) < GET_VALUE(interfaceX) - kNavTol ||
+        (GET_VALUE(rx_Layer) <= GET_VALUE(interfaceX) + kNavTol && GET_VALUE(v[0]) < kNavTol)) {
+      inAbsorber = true;
+    } else {
+      inAbsorber = false;
+    }
+  }
+  if (inAbsorber) { // in the `absorber`
     // calculate the position in the `absorber` system:
     // - the translation vector and transform the point
     fBoxAbs->SetHalfLength(0.5*absThick, 0);

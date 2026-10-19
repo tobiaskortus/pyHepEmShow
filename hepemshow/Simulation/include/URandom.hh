@@ -26,6 +26,7 @@
  * replace the `URandom` object construction in the `HepEmShow` main.
  */
 
+#include <cstdint>
 #include <random>
 
 class URandom {
@@ -41,6 +42,9 @@ public:
 
    /** Method to provide uniform random numbers on \f$(0,1)\f$ */
    G4double flat();
+
+   /** Re-seeds the underlying engine (e.g. to give each event its own stream). */
+   void SetSeed(long seed) { fEngine.seed(static_cast<std::uint64_t>(seed)); }
 
 public:
    /** c++11 implementation of the 64-bit Mersenne Twister engine */

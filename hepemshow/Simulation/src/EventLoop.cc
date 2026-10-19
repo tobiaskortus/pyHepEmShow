@@ -11,6 +11,7 @@
 
 #include "TrackStack.hh"
 #include "SteppingLoop.hh"
+#include "URandom.hh"
 
 
 #include "sys/time.h"
@@ -22,7 +23,8 @@ void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, 
                               const std::vector<double>& particle_energies,
                               const std::vector<double>& particle_energies_dot,
                               const std::vector<std::vector<double>>& absorber_thickness_dots,
-                              const std::vector<std::vector<double>>& gap_thickness_dots) {
+                              const std::vector<std::vector<double>>& gap_thickness_dots,
+                              URandom* theURnd, long seed_base) {
   //
   // first create the container for the tracks, i.e. the track-stack:
   // - before and at the end of a given event processing: empty
@@ -59,6 +61,14 @@ void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, 
     //
     // 0. Reset the track ID before each new event such that it starts from zero again.
     theTrackStack.ReSetTrackID();
+    //
+    // 0b. Give every event its own random stream: a branch flip (e.g. a
+    //     navigation coin-flip at a surface) in one event must not shift the
+    //     draws consumed by any other event.
+    if (theURnd) {
+      theURnd->SetSeed(seed_base + eventID);
+      theTLData.GetRNGEngine()->DiscardGauss();
+    }
     //
     // 1. Generate the primary track of this event:
     // NOTE: each event is assumed to have one primary now just for simplicity

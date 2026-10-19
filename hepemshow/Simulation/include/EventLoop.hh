@@ -56,12 +56,17 @@ public:
    *        (`num_events` rows of `num_layers` values; empty to keep the geometry dot values fixed)
    * @param gap_thickness_dots per-event, per-layer forward-mode gap thickness dot values
    *        (`num_events` rows of `num_layers` values; empty to keep the geometry dot values fixed)
+   * @param theURnd the uniform random number generator used by the simulation; when given,
+   *        it is re-seeded with `seed_base + eventID` at the start of each event.
+   * @param seed_base base seed for the per-event reseeding (ignored when `theURnd` is null)
    */
   static void ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity,
                             const std::vector<double>& particle_energies,
                             const std::vector<double>& particle_energies_dot,
                             const std::vector<std::vector<double>>& absorber_thickness_dots = {},
-                            const std::vector<std::vector<double>>& gap_thickness_dots = {});
+                            const std::vector<std::vector<double>>& gap_thickness_dots = {},
+                            class URandom* theURnd = nullptr,
+                            long seed_base = 0);
 
 private:
   EventLoop() = delete;

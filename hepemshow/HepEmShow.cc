@@ -49,6 +49,7 @@ nb::dict run_simulation(
     int                        gy          = 1,
     int                        gz          = 1,
     double                     gaussian_sigma         = -1.0,
+    const std::string&         kernel      = "trilinear",
     ConstNdArray4D             bar_edep               = {},
     const std::vector<double>& absorber_thickness_dot = {},
     const std::vector<double>& gap_thickness_dot      = {},
@@ -153,6 +154,18 @@ nb::dict run_simulation(
     theGeometry.SetCaloSizeYZ(transverse_size);
     theGeometry.SetGranularity(gy, gz);
     theGeometry.SetGaussianSigma(gaussian_sigma);
+    
+    if (kernel == "hard") {
+      theGeometry.SetEdepKernel(EdepKernel::Hard);
+    } else if (kernel == "gaussian") {
+      theGeometry.SetEdepKernel(EdepKernel::Gaussian);
+    } else if (kernel == "trilinear") {
+      theGeometry.SetEdepKernel(EdepKernel::Trilinear);
+    } else {
+      throw std::runtime_error(
+        "run_simulation: unknown kernel '" + kernel + "' (expected 'hard', 'gaussian' or 'trilinear')");
+    }
+    
     {
       std::vector<G4double> absThickVec(absorber_thickness.begin(), absorber_thickness.end());
       std::vector<G4double> gapThickVec(gap_thickness.begin(), gap_thickness.end());
@@ -190,7 +203,8 @@ nb::dict run_simulation(
     EventLoop::ProcessEvents(*theTLData, *theState, thePrimaryGenerator, theGeometry,
                              theResult, num_events, verbosity,
                              particle_energies, particle_energies_dot,
-                             absorber_thickness_dots, gap_thickness_dots);
+                             absorber_thickness_dots, gap_thickness_dots,
+                             theURnd, static_cast<long>(random_seed));
 
     delete theRandomEngine;
     delete theURnd;
@@ -258,6 +272,7 @@ NB_MODULE(PYHEPEMSHOW_MODULE_NAME, m) {
       nb::arg("gy")      = 1,
       nb::arg("gz")      = 1,
       nb::arg("gaussian_sigma")     = -1.0,
+      nb::arg("kernel")             = "trilinear",
       nb::arg("bar_edep")           = nb::none(),
       nb::arg("absorber_thickness_dot") = std::vector<double>{},
       nb::arg("gap_thickness_dot")      = std::vector<double>{},

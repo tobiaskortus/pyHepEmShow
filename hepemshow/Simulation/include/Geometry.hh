@@ -133,6 +133,12 @@
 // forward
 class Box;
 
+/**
+ * Selection of the energy-deposit readout kernel applied in the transverse
+ * (yz) plane of each layer (see `SteppingLoop::SteppingAction`).
+ */
+enum class EdepKernel { Hard, Gaussian, Trilinear };
+
 class Geometry {
 
 public:
@@ -297,6 +303,10 @@ public:
   void SetGaussianSigma(double s) { fGaussianSigma = s; }
   double GetGaussianSigma() const { return fGaussianSigma; }
 
+  /** Sets the energy-deposit readout kernel applied in the transverse (yz) plane. */
+  void SetEdepKernel(EdepKernel kernel) { fEdepKernel = kernel; }
+  EdepKernel GetEdepKernel() const { return fEdepKernel; }
+
 
   /**
     * Locates a point in the geometry and calculates the distance till the next boundary.
@@ -419,6 +429,7 @@ private:
   double fInvCellSizeY;
   double fInvCellSizeZ;
   double fGaussianSigma = -1.0;
+  EdepKernel fEdepKernel = EdepKernel::Trilinear;
 
   /** The `x`-coordinate of the `calorimeter` boundary on the left hand size.
     * Calculated automatically (whenever the related parameters are updated) */
