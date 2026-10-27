@@ -9,7 +9,9 @@ project(hepemshow)
 set(PYHEPEMSHOW_MODULE_NAME "_core" CACHE STRING "Python extension module target name")
 
 # Have linker set RPATH, not RUNPATH
-SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--disable-new-dtags")
+if(NOT APPLE)
+  SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--disable-new-dtags")
+endif()
 
 #----------------------------------------------------------------------------
 # Find G4HepEm (sets G4HepEm_geant4_FOUND if a complete, Geant4 dependent build)
