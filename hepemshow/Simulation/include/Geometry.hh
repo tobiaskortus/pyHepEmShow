@@ -28,7 +28,7 @@
  * - `absorber`:
  *   - thickness:   `fAbsThick`
  *   - set/get  :   `SetAbsThickPerLayer(std::vector<G4double>)`/`GetAbsThickVec()`
- *   - material :   lead tungstate/atolzite (`"G4_PbWO4"`) with material `index = 1` (by default)
+ *   - material :   iron (`"G4_Fe"`) with material `index = 1` (by default)
  *
  * - `gap`:
  *   - thickness:   `fGapThick`
@@ -51,7 +51,7 @@
  * to extract the provided data files, is
  *
  *     // list of Geant4 (NIST) material names
- *     std::vector<std::string> matList {"G4_Galactic", "G4_PbWO4", "G4_lAr"};
+ *     std::vector<std::string> matList {"G4_Galactic", "G4_Fe", "G4_lAr"};
  *
  * hence the above `material - index` mapping.
  * Changing the material name(s) in this above vector (especially at index `1`

@@ -44,6 +44,19 @@ public:
     return (sum-extremes_sum)/(n-nmins-nmaxs);
   }
 
+  /*! Get the sum of the data points that were previously registered.
+   *
+   * If nmins/nmaxs were set during construction, the corresponding number
+   * of outliers will be excluded. The caller should make sure that at
+   * least one element remains.
+   */
+  Scalar getSum() const {
+    Scalar extremes_sum = 0;
+    for(Scalar s : mins) extremes_sum+=s;
+    for(Scalar s : maxs) extremes_sum+=s;
+    return sum-extremes_sum;
+  }
+
   Scalar getVar() const {
     return getMeanSq() - getMean()*getMean();
   }

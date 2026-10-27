@@ -8,7 +8,7 @@
 #include <iostream>
 
 Geometry::Geometry() {
-  // default values: 50 layers of 2.3 [mm] absorber (PbWO4) and 5.7 [mm] gap (lAr)
+  // default values: 50 layers of 2.3 [mm] absorber (Fe) and 5.7 [mm] gap (lAr)
   fNumLayers  =  50;
   fCaloSizeYZ = 400; // default value [mm]
 
@@ -31,11 +31,11 @@ Geometry::Geometry() {
   // crate shapes here for all objects:
   // - their proper size is set when calling `UpdateParameters` below
   // - material index is set to 0, 1 or 2 that corresponds to (using the default
-  //   material list) {0 - G4_Galactic; 1 - G4_PbWO4, 2 - G4_lAr}
+  //   material list) {0 - G4_Galactic; 1 - G4_Fe, 2 - G4_lAr}
   fBoxWorld  = new Box("World", 0, 1,1,1); // material index = 0 G4_Galactic
   fBoxCalo   = new Box("Calo" , 0, 1,1,1); // material index = 0 G4_Galactic
   fBoxLayer  = new Box("Layer", 0, 1,1,1); // material index = 0 G4_Galactic
-  fBoxAbs    = new Box("Abs"  , 1, 1,1,1); // material index = 1 G4_PbWO4
+  fBoxAbs    = new Box("Abs"  , 1, 1,1,1); // material index = 1 G4_Fe
   fBoxGap    = new Box("Gap"  , 2, 1,1,1); // material index = 2 G4_lAr
 
   UpdateParameters();

@@ -52,7 +52,8 @@ nb::dict run_simulation(
     const std::vector<double>& bar_edep               = {},
     // CODI_FORWARD tangent seeds (per-layer or empty for zero; ignored in non-AD builds)
     const std::vector<double>& absorber_thickness_dot = {},
-    const std::vector<double>& gap_thickness_dot      = {})
+    const std::vector<double>& gap_thickness_dot      = {},
+    bool                       absorber_passive       = false)
 {
   // Derive number of layers from the thickness vectors
   if (absorber_thickness.size() != gap_thickness.size())
@@ -138,6 +139,7 @@ nb::dict run_simulation(
     thePrimaryGenerator.SetKinEnergy(particle_energy_min);
 
     Results theResult;
+    theResult.fAbsorberPassive = absorber_passive;
     theResult.fEdepPerCell_CurrentEvent.assign(num_layers,
       std::vector<std::vector<G4double>>(gy, std::vector<G4double>(gz, 0.0)));
     const std::size_t cellCount = static_cast<std::size_t>(num_layers) * static_cast<std::size_t>(gy) * static_cast<std::size_t>(gz);
@@ -173,8 +175,8 @@ nb::dict run_simulation(
     res_bar_thickness_absorber.resize(num_layers);
     res_bar_thickness_gap.resize(num_layers);
     for (int i = 0; i < num_layers; ++i) {
-      res_bar_thickness_absorber[i] = theResult.barThicknessAbsorber[i].getMean();
-      res_bar_thickness_gap[i]      = theResult.barThicknessGap[i].getMean();
+      res_bar_thickness_absorber[i] = theResult.barThicknessAbsorber[i].getSum();
+      res_bar_thickness_gap[i]      = theResult.barThicknessGap[i].getSum();
     }
     res_bar_particle_energy_mean = theResult.barParticleEnergy.getMean();
     res_bar_particle_energy_var  = theResult.barParticleEnergy.getVar();
@@ -241,7 +243,8 @@ NB_MODULE(PYHEPEMSHOW_MODULE_NAME, m) {
       nb::arg("gaussian_sigma")     = -1.0,
       nb::arg("bar_edep")           = std::vector<double>{},
       nb::arg("absorber_thickness_dot") = std::vector<double>{},
-      nb::arg("gap_thickness_dot")      = std::vector<double>{});
+      nb::arg("gap_thickness_dot")      = std::vector<double>{},
+      nb::arg("absorber_passive")       = false);
   };
 
   m.attr("compiled_mode") = PYHEPEMSHOW_MODE_NAME;

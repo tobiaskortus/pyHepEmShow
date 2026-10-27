@@ -45,6 +45,7 @@
  * Mean quantities are computed over the simulated events.
  */
 struct Results {
+  bool fAbsorberPassive = false; ///< if true, energy deposits in the absorber volume are not recorded (passive absorber)
   std::vector<std::vector<std::vector<G4double>>> fEdepPerCell_CurrentEvent; ///< per-cell energy deposit accumulator for the current event, sized [numLayers][gy][gz]
   std::vector<double> fEdepPerCell; ///< per-event per-cell energy deposits, flat row-major [events * layers * gy * gz]
   std::vector<double> fParticleEnergy; ///< per-event primary particle kinetic energy [MeV]

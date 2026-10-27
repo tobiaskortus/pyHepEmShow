@@ -146,7 +146,7 @@ private:
    * @param currentVolume pointer to the volume (`absorber`/`gap`) in which the simulation step was done
    * @param currentPhysStepLength real (physical) length of the step
    * @param indxLayer index of the layer in which the step was done
-   * @param indxAbsorber indicates if the step was done in the `absorber` (0) or in the `gap` (1)
+   * @param indxAbsorber indicates if the step was done in the `absorber` (0) or in the `gap` (1). Absorber steps are skipped when `Results::fAbsorberPassive` is set.
    * @param eventID ID of the event to which the particle under tracking belongs to
    * @param stepID ID of this step that was just performed, i.e. number of steps cmpleted so far with with the current track
    */

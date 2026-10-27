@@ -320,8 +320,10 @@ void SteppingLoop::StackSecondaries(G4HepEmTLData& theTLData, TrackStack& theTra
 }
 
 
-void SteppingLoop::SteppingAction(Results& theResult, const G4HepEmTrack& theTrack, const Box* /*currentVolume*/, G4double /*currentPhysStepLength*/, int indxLayer, int /*indxAbsorber*/, int indxCellY, int indxCellZ, G4double posY, G4double posZ, const Geometry& theGeometry, int /*eventID*/, int /*stepID*/) {
+void SteppingLoop::SteppingAction(Results& theResult, const G4HepEmTrack& theTrack, const Box* /*currentVolume*/, G4double /*currentPhysStepLength*/, int indxLayer, int indxAbsorber, int indxCellY, int indxCellZ, G4double posY, G4double posZ, const Geometry& theGeometry, int /*eventID*/, int /*stepID*/) {
   if (indxLayer < 0) return;
+  // Passive absorber: do not record energy deposited in the absorber volume
+  if (theResult.fAbsorberPassive && indxAbsorber == 0) return;
   //
   const G4double edep = theTrack.GetEnergyDeposit();
   if (edep <= 0.0) return;
