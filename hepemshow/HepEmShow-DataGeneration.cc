@@ -66,10 +66,10 @@ int main () {
   const G4double secProdThreshold = 0.7 * mm;
 
   // list of Geant4 (NIST) material names (change the listed material names and regenerate the data)
-  std::vector<std::string> matList {"G4_Galactic", "G4_PbWO4", "G4_lAr"};
+  std::vector<std::string> matList {"G4_Galactic", "G4_Fe", "G4_PbWO4"};
 
   // output, i.e. the G4HepEm data, file name (change the file mane and regenerate the data)
-  const G4String fileName    = "../data/hepem_data";
+  const G4String fileName    = "../data/hepem_data_fe_pbwo4";
   const G4String g4hepemFile = fileName + ".json";
 
   // create a fake Geant4 geometry and init to have the material-cuts couples

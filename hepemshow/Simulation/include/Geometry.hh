@@ -28,7 +28,7 @@
  * - `absorber`:
  *   - thickness:   `fAbsThick`
  *   - set/get  :   `SetAbsThickPerLayer(std::vector<G4double>)`/`GetAbsThickVec()`
- *   - material :   lead tungstate/atolzite (`"G4_PbWO4"`) with material `index = 1` (by default)
+ *   - material :   lead tungstate (`"G4_PbWO4"`) with material `index = 1` (bundled data)
  *
  * - `gap`:
  *   - thickness:   `fGapThick`
@@ -50,8 +50,11 @@
  * during the simulation. The default vector in `DataGeneration.cc`, that was used
  * to extract the provided data files, is
  *
- *     // list of Geant4 (NIST) material names
+ *     // list of Geant4 (NIST) material names used for the bundled data file
  *     std::vector<std::string> matList {"G4_Galactic", "G4_PbWO4", "G4_lAr"};
+ *
+ * The current `HepEmShow-DataGeneration` default is
+ * `{"G4_Galactic", "G4_Fe", "G4_PbWO4"}`; regenerate the data file to use it.
  *
  * hence the above `material - index` mapping.
  * Changing the material name(s) in this above vector (especially at index `1`
@@ -306,7 +309,6 @@ public:
   /** Sets the energy-deposit readout kernel applied in the transverse (yz) plane. */
   void SetEdepKernel(EdepKernel kernel) { fEdepKernel = kernel; }
   EdepKernel GetEdepKernel() const { return fEdepKernel; }
-
 
   /**
     * Locates a point in the geometry and calculates the distance till the next boundary.

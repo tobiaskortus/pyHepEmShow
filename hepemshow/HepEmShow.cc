@@ -51,11 +51,13 @@ nb::dict run_simulation(
     double                     gaussian_sigma         = -1.0,
     const std::string&         kernel      = "trilinear",
     ConstNdArray4D             bar_edep               = {},
+    // CODI_FORWARD tangent seeds (per-layer or empty for zero; ignored in non-AD builds)
     const std::vector<double>& absorber_thickness_dot = {},
     const std::vector<double>& gap_thickness_dot      = {},
     const std::vector<double>& particle_energies_dot  = {},
     const std::vector<std::vector<double>>& absorber_thickness_dots = {},
-    const std::vector<std::vector<double>>& gap_thickness_dots      = {})
+    const std::vector<std::vector<double>>& gap_thickness_dots      = {},
+    bool                       absorber_passive       = false)
 {
   // Derive number of layers from the thickness vectors
   if (absorber_thickness.size() != gap_thickness.size())
@@ -185,6 +187,7 @@ nb::dict run_simulation(
     thePrimaryGenerator.SetDirection(1.0, 0.0, 0.0);
 
     Results theResult;
+    theResult.fAbsorberPassive = absorber_passive;
     theResult.fEdepPerCell_CurrentEvent.assign(num_layers,
       std::vector<std::vector<G4double>>(gy, std::vector<G4double>(gz, 0.0)));
     const std::size_t cellCount = static_cast<std::size_t>(num_layers) * static_cast<std::size_t>(gy) * static_cast<std::size_t>(gz);
@@ -278,7 +281,8 @@ NB_MODULE(PYHEPEMSHOW_MODULE_NAME, m) {
       nb::arg("gap_thickness_dot")      = std::vector<double>{},
       nb::arg("particle_energies_dot")  = std::vector<double>{},
       nb::arg("absorber_thickness_dots") = std::vector<std::vector<double>>{},
-      nb::arg("gap_thickness_dots")      = std::vector<std::vector<double>>{});
+      nb::arg("gap_thickness_dots")      = std::vector<std::vector<double>>{},
+      nb::arg("absorber_passive")       = false);
   };
 
   m.attr("compiled_mode") = PYHEPEMSHOW_MODE_NAME;
