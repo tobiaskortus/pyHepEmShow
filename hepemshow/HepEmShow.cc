@@ -1,32 +1,12 @@
-#include "ad_type.h"
+#include "SimulationRun.hh"
 
-// G4HepEm includes
-#include "G4HepEmState.hh"
-#include "G4HepEmData.hh"
-#include "G4HepEmDataJsonIO.hh"
-#include "G4HepEmTLData.hh"
-#include "G4HepEmRandomEngine.hh"
-
-// Local simulation includes
-#include "URandom.hh"
-#include "Geometry.hh"
-#include "PrimaryGenerator.hh"
-#include "Results.hh"
-#include "EventLoop.hh"
-
-// nanobind
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
-#include <fstream>
-#include <stdexcept>
-#include <cmath>
-#include <algorithm>
 #include <string>
 #include <vector>
-#include <mutex>
 
 namespace nb = nanobind;
 
@@ -55,133 +35,29 @@ nb::dict run_simulation(
     const std::vector<double>& gap_thickness_dot      = {},
     bool                       absorber_passive       = false)
 {
-  // Derive number of layers from the thickness vectors
-  if (absorber_thickness.size() != gap_thickness.size())
-    throw std::runtime_error(
-      "run_simulation: absorber_thickness and gap_thickness must have the same length "
-      "(got " + std::to_string(absorber_thickness.size()) + " vs "
-              + std::to_string(gap_thickness.size()) + ")");
-              
   const int num_layers = (int)absorber_thickness.size();
-
-  if (!absorber_thickness_dot.empty() && (int)absorber_thickness_dot.size() != num_layers)
-    throw std::runtime_error(
-      "run_simulation: absorber_thickness_dot must be empty or match the number of layers "
-      "(" + std::to_string(num_layers) + "), got " + std::to_string(absorber_thickness_dot.size()));
-
-  if (!gap_thickness_dot.empty() && (int)gap_thickness_dot.size() != num_layers)
-    throw std::runtime_error(
-      "run_simulation: gap_thickness_dot must be empty or match the number of layers "
-      "(" + std::to_string(num_layers) + "), got " + std::to_string(gap_thickness_dot.size()));
-
-  const std::size_t total_cells_per_layer = static_cast<std::size_t>(gy) * static_cast<std::size_t>(gz);
-  const std::size_t total_cells_per_event = static_cast<std::size_t>(num_layers) * total_cells_per_layer;
-
-#ifdef CODI_REVERSE
-  const std::size_t num_layers_sz = static_cast<std::size_t>(num_layers);
-  const std::size_t num_events_sz = static_cast<std::size_t>(num_events);
-  const std::size_t event_cell_size = num_events_sz * total_cells_per_event;
-  if (!bar_edep.empty() && bar_edep.size() != total_cells_per_event && bar_edep.size() != event_cell_size) {
-    throw std::runtime_error(
-      "run_simulation: bar_edep must be empty, per-event (" + std::to_string(total_cells_per_event) +
-      "), or per-event-per-cell (" + std::to_string(event_cell_size) + "), got " +
-      std::to_string(bar_edep.size()));
-  }
-#endif
-  std::vector<double> res_edep_per_cell;
-  std::vector<double> res_particle_energy;
-#if CODI_FORWARD
-  std::vector<double> res_edep_per_cell_dot;
-#endif
-#ifdef CODI_REVERSE
-  const std::vector<double> bar_edep_local = bar_edep;
-  std::vector<double> res_bar_thickness_absorber;
-  std::vector<double> res_bar_thickness_gap;
-  double              res_bar_particle_energy_mean = 0.0;
-  double              res_bar_particle_energy_var  = 0.0;
-#endif
-
+  SimulationRunResult result;
   {
     nb::gil_scoped_release release;
-
-    std::ifstream jsonIS(data_file.c_str());
-    if (!jsonIS.is_open())
-      throw std::runtime_error("run_simulation: cannot open data file: " + data_file);
-    G4HepEmState* theState = G4HepEmStateFromJson(jsonIS);
-
-    URandom*             theURnd         = new URandom(random_seed);
-    G4HepEmRandomEngine* theRandomEngine = new G4HepEmRandomEngine(theURnd);
-    G4HepEmTLData*       theTLData       = new G4HepEmTLData();
-    theTLData->SetRandomEngine(theRandomEngine);
-
-    Geometry theGeometry;
-    theGeometry.SetNumLayers(num_layers);
-    theGeometry.SetCaloSizeYZ(transverse_size);
-    theGeometry.SetGranularity(gy, gz);
-    theGeometry.SetGaussianSigma(gaussian_sigma);
-    {
-      std::vector<G4double> absThickVec(absorber_thickness.begin(), absorber_thickness.end());
-      std::vector<G4double> gapThickVec(gap_thickness.begin(), gap_thickness.end());
-#if CODI_FORWARD
-      if (!absorber_thickness_dot.empty())
-        for (int i = 0; i < num_layers; ++i) SET_DOTVALUE(absThickVec[i], absorber_thickness_dot[i]);
-      if (!gap_thickness_dot.empty())
-        for (int i = 0; i < num_layers; ++i) SET_DOTVALUE(gapThickVec[i], gap_thickness_dot[i]);
-#endif
-      theGeometry.SetAbsThickPerLayer(absThickVec);
-      theGeometry.SetGapThickPerLayer(gapThickVec);
-    }
-
-    PrimaryGenerator thePrimaryGenerator;
-    thePrimaryGenerator.SetCharge((particle == "e-") ? -1.0 : (particle == "gamma" ? 0.0 : +1.0));
-    thePrimaryGenerator.SetPosition(theGeometry.GetPrimaryXposition(), 0.0, 0.0);
-    thePrimaryGenerator.SetDirection(1.0, 0.0, 0.0);
-    thePrimaryGenerator.SetKinEnergy(particle_energy_min);
-
-    Results theResult;
-    theResult.fAbsorberPassive = absorber_passive;
-    theResult.fEdepPerCell_CurrentEvent.assign(num_layers,
-      std::vector<std::vector<G4double>>(gy, std::vector<G4double>(gz, 0.0)));
-    const std::size_t cellCount = static_cast<std::size_t>(num_layers) * static_cast<std::size_t>(gy) * static_cast<std::size_t>(gz);
-    theResult.fEdepPerCell.reserve(num_events * cellCount);
-    theResult.fParticleEnergy.reserve(num_events);
-#if CODI_FORWARD
-    theResult.fEdepPerCellD.reserve(num_events * cellCount);
-#endif
-#ifdef CODI_REVERSE
-    theResult.barEdep = bar_edep_local.empty()
-      ? std::vector<double>(static_cast<std::size_t>(num_events) * static_cast<std::size_t>(total_cells_per_event), 0.0)
-      : bar_edep_local;
-    theResult.barThicknessAbsorber.resize(num_layers);
-    theResult.barThicknessGap.resize(num_layers);
-#endif
-    EventLoop::ProcessEvents(*theTLData, *theState, thePrimaryGenerator, theGeometry,
-                             theResult, num_events, verbosity,
-                             particle_energy_min, particle_energy_max, theURnd);
-
-    delete theRandomEngine;
-    delete theURnd;
-    delete theTLData;
-    FreeG4HepEmData(theState->fData);
-    delete theState;
-
-    // Move data before GIL is re-acquired
-    res_edep_per_cell   = std::move(theResult.fEdepPerCell);
-    res_particle_energy  = std::move(theResult.fParticleEnergy);
-#if CODI_FORWARD
-    res_edep_per_cell_dot = std::move(theResult.fEdepPerCellD);
-#endif
-#ifdef CODI_REVERSE
-    res_bar_thickness_absorber.resize(num_layers);
-    res_bar_thickness_gap.resize(num_layers);
-    for (int i = 0; i < num_layers; ++i) {
-      res_bar_thickness_absorber[i] = theResult.barThicknessAbsorber[i].getSum();
-      res_bar_thickness_gap[i]      = theResult.barThicknessGap[i].getSum();
-    }
-    res_bar_particle_energy_mean = theResult.barParticleEnergy.getMean();
-    res_bar_particle_energy_var  = theResult.barParticleEnergy.getVar();
-#endif
-  } // GIL re-acquired here
+    result = simulate(
+      data_file,
+      absorber_thickness,
+      gap_thickness,
+      transverse_size,
+      particle,
+      particle_energy_min,
+      particle_energy_max,
+      num_events,
+      random_seed,
+      verbosity,
+      gy,
+      gz,
+      gaussian_sigma,
+      bar_edep,
+      absorber_thickness_dot,
+      gap_thickness_dot,
+      absorber_passive);
+  }
 
   auto to_numpy4d = [num_events, num_layers, gy, gz](std::vector<double> v) {
     auto* heap = new std::vector<double>(std::move(v));
@@ -201,27 +77,28 @@ nb::dict run_simulation(
     return nb::ndarray<nb::numpy, double, nb::ndim<1>>(heap->data(), 1, shape, owner);
   };
 
-  nb::dict result;
-  result["edep_per_cell"]    = to_numpy4d(std::move(res_edep_per_cell));
-  result["particle_energies"] = to_numpy1d(std::move(res_particle_energy));
+  nb::dict out;
+  out["edep_per_cell"]    = to_numpy4d(std::move(result.edep_per_cell));
+  out["particle_energies"] = to_numpy1d(std::move(result.particle_energies));
 #if CODI_FORWARD
-  result["edep_per_cell_dot"] = to_numpy4d(std::move(res_edep_per_cell_dot));
+  out["edep_per_cell_dot"] = to_numpy4d(std::move(result.edep_per_cell_dot));
 #endif
 #ifdef CODI_REVERSE
-  auto to_numpy1d_vec = [num_layers](std::vector<double> v) {
+  auto to_numpy1d_vec = [](std::vector<double> v) {
+    const size_t num_layers = v.size();
     auto* heap = new std::vector<double>(std::move(v));
     nb::capsule owner(heap, [](void* p) noexcept { delete static_cast<std::vector<double>*>(p); });
-    size_t shape[1] = {(size_t)num_layers};
+    size_t shape[1] = {num_layers};
     return nb::ndarray<nb::numpy, double, nb::ndim<1>>(heap->data(), 1, shape, owner);
   };
-  result["bar_thickness_absorber"] = to_numpy1d_vec(std::move(res_bar_thickness_absorber));
-  result["bar_thickness_gap"]      = to_numpy1d_vec(std::move(res_bar_thickness_gap));
+  out["bar_thickness_absorber"] = to_numpy1d_vec(std::move(result.bar_thickness_absorber));
+  out["bar_thickness_gap"]      = to_numpy1d_vec(std::move(result.bar_thickness_gap));
   nb::dict bar_pe;
-  bar_pe["mean"] = res_bar_particle_energy_mean;
-  bar_pe["var"]  = res_bar_particle_energy_var;
-  result["bar_particle_energy"] = bar_pe;
+  bar_pe["mean"] = result.bar_particle_energy_mean;
+  bar_pe["var"]  = result.bar_particle_energy_var;
+  out["bar_particle_energy"] = bar_pe;
 #endif
-  return result;
+  return out;
 }
 
 

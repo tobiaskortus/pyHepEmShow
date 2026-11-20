@@ -6,6 +6,9 @@ if(${CMAKE_VERSION} VERSION_LESS 3.12)
 endif()
 project(hepemshow)
 
+option(PYHEPEMSHOW_BUILD_PYTHON "Build the nanobind extension" ON)
+option(PYHEPEMSHOW_BUILD_NATIVE "Build the native HDF5 CLI" OFF)
+set(PYHEPEMSHOW_DSBO_INCLUDE_DIR "" CACHE PATH "Path to dsbo/cpp/include")
 set(PYHEPEMSHOW_MODULE_NAME "_core" CACHE STRING "Python extension module target name")
 
 # Have linker set RPATH, not RUNPATH
@@ -46,6 +49,7 @@ set(headers_SIM
   ${CMAKE_SOURCE_DIR}/Simulation/include/Physics.hh
   ${CMAKE_SOURCE_DIR}/Simulation/include/PrimaryGenerator.hh
   ${CMAKE_SOURCE_DIR}/Simulation/include/Results.hh
+  ${CMAKE_SOURCE_DIR}/Simulation/include/SimulationRun.hh
   ${CMAKE_SOURCE_DIR}/Simulation/include/SteppingLoop.hh
   ${CMAKE_SOURCE_DIR}/Simulation/include/TrackStack.hh
   ${CMAKE_SOURCE_DIR}/Simulation/include/URandom.hh
@@ -59,6 +63,7 @@ set(sources_SIM
   ${CMAKE_SOURCE_DIR}/Simulation/src/Physics.cc
   ${CMAKE_SOURCE_DIR}/Simulation/src/PrimaryGenerator.cc
   ${CMAKE_SOURCE_DIR}/Simulation/src/Results.cc
+  ${CMAKE_SOURCE_DIR}/Simulation/src/SimulationRun.cc
   ${CMAKE_SOURCE_DIR}/Simulation/src/SteppingLoop.cc
   ${CMAKE_SOURCE_DIR}/Simulation/src/TrackStack.cc
   ${CMAKE_SOURCE_DIR}/Simulation/src/URandom.cc
@@ -77,44 +82,72 @@ endif()
 
 
 #----------------------------------------------------------------------------
-# Find Python and nanobind
-find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
-execute_process(
-  COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
-  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
-find_package(nanobind CONFIG REQUIRED)
-
-#----------------------------------------------------------------------------
 # Build target(s):
-#
-# The Python extension module (replaces the HepEmShow executable):
-nanobind_add_module(${PYHEPEMSHOW_MODULE_NAME}
-  ${CMAKE_SOURCE_DIR}/HepEmShow.cc
-  ${sources_SIM}
-)
+if(PYHEPEMSHOW_BUILD_PYTHON)
+  # Find Python and nanobind
+  find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+    OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
+  find_package(nanobind CONFIG REQUIRED)
 
-target_include_directories(${PYHEPEMSHOW_MODULE_NAME}
-  PRIVATE
-  ${CMAKE_SOURCE_DIR}/Simulation/include/
-)
+  # The Python extension module (replaces the HepEmShow executable):
+  nanobind_add_module(${PYHEPEMSHOW_MODULE_NAME}
+    ${CMAKE_SOURCE_DIR}/HepEmShow.cc
+    ${sources_SIM}
+  )
 
-target_link_libraries(${PYHEPEMSHOW_MODULE_NAME}
-  PRIVATE
-  G4HepEm::g4HepEmData
-  G4HepEm::g4HepEmDataJsonIO
-)
+  target_include_directories(${PYHEPEMSHOW_MODULE_NAME}
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}/Simulation/include/
+  )
 
-target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME}
-  PRIVATE
-  PYHEPEMSHOW_MODULE_NAME=${PYHEPEMSHOW_MODULE_NAME}
-)
+  target_link_libraries(${PYHEPEMSHOW_MODULE_NAME}
+    PRIVATE
+    G4HepEm::g4HepEmData
+    G4HepEm::g4HepEmDataJsonIO
+  )
 
-if(CODI_FORWARD)
-  target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME} PRIVATE PYHEPEMSHOW_MODE_NAME="forward_ad")
-elseif(CODI_REVERSE)
-  target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME} PRIVATE PYHEPEMSHOW_MODE_NAME="reverse")
-else()
-  target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME} PRIVATE PYHEPEMSHOW_MODE_NAME="forward")
+  target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME}
+    PRIVATE
+    PYHEPEMSHOW_MODULE_NAME=${PYHEPEMSHOW_MODULE_NAME}
+  )
+
+  if(CODI_FORWARD)
+    target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME} PRIVATE PYHEPEMSHOW_MODE_NAME="forward_ad")
+  elseif(CODI_REVERSE)
+    target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME} PRIVATE PYHEPEMSHOW_MODE_NAME="reverse")
+  else()
+    target_compile_definitions(${PYHEPEMSHOW_MODULE_NAME} PRIVATE PYHEPEMSHOW_MODE_NAME="forward")
+  endif()
+endif()
+
+if(PYHEPEMSHOW_BUILD_NATIVE)
+  if(NOT PYHEPEMSHOW_DSBO_INCLUDE_DIR)
+    message(FATAL_ERROR "PYHEPEMSHOW_BUILD_NATIVE requires PYHEPEMSHOW_DSBO_INCLUDE_DIR")
+  endif()
+
+  find_package(HDF5 2.0 REQUIRED COMPONENTS C)
+  find_package(ZLIB REQUIRED)
+
+  add_executable(HepEmShowNative
+    ${CMAKE_SOURCE_DIR}/HepEmShowNative.cc
+    ${sources_SIM}
+  )
+
+  target_include_directories(HepEmShowNative
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}/Simulation/include/
+    ${PYHEPEMSHOW_DSBO_INCLUDE_DIR}
+  )
+
+  target_link_libraries(HepEmShowNative
+    PRIVATE
+    G4HepEm::g4HepEmData
+    G4HepEm::g4HepEmDataJsonIO
+    HDF5::HDF5
+    ZLIB::ZLIB
+  )
 endif()
 
 # The Data-Generation application: only if G4HepEm was built with Geant4

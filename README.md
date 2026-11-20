@@ -29,6 +29,66 @@ Geant4 is not required to run simulations.
 For an existing checkout, initialize dependencies with
 `git submodule update --init --recursive` before installing.
 
+## Native HDF5 CLI
+
+A standalone C++ executable can read a design and write flat HDF5 simulation
+outputs for DSBO's native file contract. It uses the header-only `dsbo::io` HDF5
+SDK and requires HDF5 >= 2.0 with thread safety enabled.
+
+Build the forward (non-AD) and reverse-mode variants with the helper script:
+
+```sh
+bash externals/configure_native.sh forward /path/to/dsbo/cpp/include /path/to/hdf5
+bash externals/configure_native.sh backward /path/to/dsbo/cpp/include /path/to/hdf5
+```
+
+Each build produces `hepemshow/build_native_<mode>/HepEmShowNative`. The script
+initializes the G4HepEm install for the selected mode, disables the Python
+extension, and enables the native target. It accepts an optional build type as
+the fourth argument (`Release` by default).
+
+The executable takes `forward` or `backward` as its first argument. It reads the
+design from an HDF5 TensorDict with `absorber` and `gap` fields:
+
+```sh
+HepEmShowNative forward \
+  --input in.h5 \
+  --edep-output simulation.h5 \
+  --energy-output energies.h5 \
+  --labels-output labels.h5 \
+  --data-file /opt/hepemshow/data/hepem_data_fe_pbwo4.json \
+  --num-events 1000 --seed 1234 --particle e- \
+  --energy-min 10000 --energy-max 10000 \
+  --transverse-size 400 --gy 1 --gz 1 \
+  --absorber-passive --verbosity 0
+```
+
+Forward mode writes three flat primal files: `simulation.h5` with shape
+`(num_events, num_layers, gy, gz)`, and `energies.h5` and `labels.h5` with shape
+`(num_events,)`. The executable does not write the design vector; callers such
+as the DSBO container module write it from the design tensors they already hold.
+
+Reverse mode reads the flat edep primal and an incoming adjoint, reruns the
+simulation with reverse-mode CoDiPack using the same settings and seed, and
+writes a TensorDict gradient with `absorber` and `gap` keys:
+
+```sh
+HepEmShowNative backward \
+  --input in.h5 \
+  --edep-output simulation.h5 \
+  --edep-adjoint simulation_gradient.h5 \
+  --input-adjoint in_gradient.h5 \
+  --data-file /opt/hepemshow/data/hepem_data_fe_pbwo4.json \
+  --num-events 1000 --seed 1234 --particle e- \
+  --energy-min 10000 --energy-max 10000 \
+  --transverse-size 400 --gy 1 --gz 1 \
+  --absorber-passive --verbosity 0
+```
+
+The backward command is only available when G4HepEm was built with
+`CODI_REVERSE`; otherwise it reports an error and exits nonzero. Forward-mode
+tangents are not supported by the native CLI.
+
 ## Usage
 
 ```python
