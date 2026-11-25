@@ -128,6 +128,7 @@ if(PYHEPEMSHOW_BUILD_NATIVE)
   endif()
 
   find_package(HDF5 2.0 REQUIRED COMPONENTS C)
+  find_package(Threads REQUIRED)
   find_package(ZLIB REQUIRED)
 
   add_executable(HepEmShowNative
@@ -146,6 +147,7 @@ if(PYHEPEMSHOW_BUILD_NATIVE)
     G4HepEm::g4HepEmData
     G4HepEm::g4HepEmDataJsonIO
     HDF5::HDF5
+    Threads::Threads
     ZLIB::ZLIB
   )
 endif()

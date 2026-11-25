@@ -34,7 +34,7 @@
 //       to boundary as for sure the step will end up far from the boundaries.
 //       But here we have a simplified gometry and navigation....
 
-void SteppingLoop::GammaStepper(G4HepEmTLData& theTLData, G4HepEmState& theState, TrackStack& theTrackStack, Geometry& theGeometry, Results& theResult, int eventID) {
+void SteppingLoop::GammaStepper(G4HepEmTLData& theTLData, const G4HepEmState& theState, TrackStack& theTrackStack, Geometry& theGeometry, Results& theResult, int eventID) {
   // NOTE: the start tracking procedure (reset the track and the rng) was done
   G4HepEmTrack* theTrack = theTLData.GetPrimaryGammaTrack()->GetTrack();
 
@@ -127,7 +127,7 @@ void SteppingLoop::GammaStepper(G4HepEmTLData& theTLData, G4HepEmState& theState
 }
 
 
-void SteppingLoop::ElectronStepper(G4HepEmTLData& theTLData, G4HepEmState& theState, TrackStack& theTrackStack, Geometry& theGeometry, Results& theResult, int eventID) {
+void SteppingLoop::ElectronStepper(G4HepEmTLData& theTLData, const G4HepEmState& theState, TrackStack& theTrackStack, Geometry& theGeometry, Results& theResult, int eventID) {
   // NOTE: the start tracking procedure (reset the track and the rng) was already done in the EventLoop
   G4HepEmTrack*           theTrack = theTLData.GetPrimaryElectronTrack()->GetTrack();
   G4HepEmMSCTrackData*  theMSCData = theTLData.GetPrimaryElectronTrack()->GetMSCTrackData();

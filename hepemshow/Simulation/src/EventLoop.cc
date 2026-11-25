@@ -19,7 +19,7 @@
 #include <iostream>
 
 
-void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity,
+void EventLoop::ProcessEvents(G4HepEmTLData& theTLData, const G4HepEmState& theState, PrimaryGenerator& thePrimaryGenerator, Geometry& theGeometry, Results& theResult, int numEventToSimulate, int verbosity,
                               double particle_energy_min, double particle_energy_max, URandom* theURnd) {
   //
   // first create the container for the tracks, i.e. the track-stack:

@@ -3,6 +3,7 @@
 #ifndef SIMULATIONRUN_HH
 #define SIMULATIONRUN_HH
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,13 @@ struct SimulationRunResult {
   double bar_particle_energy_var = 0.0;
 #endif
 };
+
+struct G4HepEmState;
+struct SimulationStateDeleter {
+  void operator()(const G4HepEmState* state) const noexcept;
+};
+using SimulationState = std::unique_ptr<const G4HepEmState, SimulationStateDeleter>;
+SimulationState load_simulation_state(const std::string& data_file);
 
 SimulationRunResult simulate(
   const std::string& data_file,
@@ -37,6 +45,7 @@ SimulationRunResult simulate(
   const std::vector<double>& bar_edep,
   const std::vector<double>& absorber_thickness_dot,
   const std::vector<double>& gap_thickness_dot,
-  bool absorber_passive);
+  bool absorber_passive,
+  const G4HepEmState* state = nullptr);
 
 #endif // SIMULATIONRUN_HH

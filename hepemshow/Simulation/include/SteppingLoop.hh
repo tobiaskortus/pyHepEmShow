@@ -15,9 +15,9 @@
  *
  * The stepping loops can calculate a given \f$\gamma\f$ or \f$e^-/e^+\f$ particle
  * simulation history from their initial state till the end in a step-by-step way
- * (by the `SteppingLoop::GammaStepper(G4HepEmTLData&, G4HepEmState&, TrackStack&,
+ * (by the `SteppingLoop::GammaStepper(G4HepEmTLData&, const G4HepEmState&, TrackStack&,
  * Geometry&, Results&, int)` and `SteppingLoop::ElectronStepper(G4HepEmTLData&,
- * G4HepEmState&, TrackStack&, Geometry&, Results&, int)` respectively). At each
+ * const G4HepEmState&, TrackStack&, Geometry&, Results&, int)` respectively). At each
  * step:
  * - the actual step length is calculated (accounting both the geometrical and
  *   the physics related constraints)
@@ -106,7 +106,7 @@ public:
    * @param theResult the data structure that holds all the infomation needs to be collected during the simulation. It might be updated after each simulation step by calling the `SteppingAction` method.
    * @param eventID ID of the currently simulated event, i.e. the one to which the given input \f$\gamma\f$ track belongs to
    */
-  static void GammaStepper(G4HepEmTLData& theTLData, G4HepEmState& theState, TrackStack& theTrackStack, Geometry& theGeometry, Results& theResult, int eventID);
+  static void GammaStepper(G4HepEmTLData& theTLData, const G4HepEmState& theState, TrackStack& theTrackStack, Geometry& theGeometry, Results& theResult, int eventID);
 
   /** Stepping loop for simulating the entire history of a \f$e^-/e^+\f$ track.
    *
@@ -122,7 +122,7 @@ public:
    * @param theResult the data structure that holds all the infomation needs to be collected during the simulation. It might be updated after each simulation step by calling the `SteppingAction` method.
    * @param eventID ID of the currently simulated event, i.e. the one to which the given input \f$e^-/e^+\f$ track belongs to
    */
-  static void ElectronStepper(G4HepEmTLData& theTLData, G4HepEmState& theState, TrackStack& theTrackStack, Geometry& theGeometry, Results& theResult, int eventID);
+  static void ElectronStepper(G4HepEmTLData& theTLData, const G4HepEmState& theState, TrackStack& theTrackStack, Geometry& theGeometry, Results& theResult, int eventID);
 
 
 private:

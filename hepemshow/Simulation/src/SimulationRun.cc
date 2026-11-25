@@ -21,6 +21,24 @@
 #include <string>
 #include <vector>
 
+void SimulationStateDeleter::operator()(const G4HepEmState* state) const noexcept {
+  // FreeG4HepEmData releases the nested tables, not their owner.
+  if (state->fData) FreeG4HepEmData(state->fData);
+  delete state->fData;
+  delete state->fParameters;
+  delete state;
+}
+
+SimulationState load_simulation_state(const std::string& data_file) {
+  std::ifstream input(data_file);
+  if (!input.is_open())
+    throw std::runtime_error("run_simulation: cannot open data file: " + data_file);
+  SimulationState state(G4HepEmStateFromJson(input));
+  if (!state || !state->fData || !state->fParameters)
+    throw std::runtime_error("run_simulation: incomplete state in data file: " + data_file);
+  return state;
+}
+
 SimulationRunResult simulate(
   const std::string&         data_file,
   const std::vector<double>& absorber_thickness,
@@ -38,7 +56,8 @@ SimulationRunResult simulate(
   const std::vector<double>& bar_edep,
   const std::vector<double>& absorber_thickness_dot,
   const std::vector<double>& gap_thickness_dot,
-  bool                       absorber_passive)
+  bool                       absorber_passive,
+  const G4HepEmState*        state)
 {
   if (absorber_thickness.size() != gap_thickness.size())
     throw std::runtime_error(
@@ -81,20 +100,8 @@ SimulationRunResult simulate(
 
   SimulationRunResult result;
 
-  std::ifstream jsonIS(data_file.c_str());
-  if (!jsonIS.is_open())
-    throw std::runtime_error("run_simulation: cannot open data file: " + data_file);
-  // The state is non-owning; FreeG4HepEmData releases only the nested tables.
-  const auto delete_state = [](G4HepEmState* state) {
-    FreeG4HepEmData(state->fData);
-    delete state->fData;
-    delete state->fParameters;
-    delete state;
-  };
-  std::unique_ptr<G4HepEmState, decltype(delete_state)> theState(
-    G4HepEmStateFromJson(jsonIS), delete_state);
-  if (!theState || !theState->fData || !theState->fParameters)
-    throw std::runtime_error("run_simulation: incomplete state in data file: " + data_file);
+  auto owned_state = state ? SimulationState{} : load_simulation_state(data_file);
+  if (!state) state = owned_state.get();
 
   URandom theURnd(random_seed);
   G4HepEmRandomEngine theRandomEngine(&theURnd);
@@ -151,7 +158,7 @@ SimulationRunResult simulate(
   theResult.barThicknessGap.resize(num_layers);
 #endif
 
-  EventLoop::ProcessEvents(theTLData, *theState, thePrimaryGenerator, theGeometry,
+  EventLoop::ProcessEvents(theTLData, *state, thePrimaryGenerator, theGeometry,
                            theResult, num_events, verbosity,
                            particle_energy_min, particle_energy_max, &theURnd);
 
